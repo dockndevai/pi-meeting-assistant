@@ -1,0 +1,43 @@
+services:
+  pi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    image: pi-meeting:latest
+    container_name: pi-meeting
+    platform: linux/arm64
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      MOCK: "false"
+      PORT: "3000"
+      SERVER_URL: "http://localhost:3000"
+      PULSE_SERVER: host.docker.internal
+    volumes:
+      # Mount test-transcripts so you can drop .txt files from your laptop
+      - ./test-transcripts:/test-transcripts
+      # Persist recordings
+      - pi-recordings:/recordings
+      # Live meetings + transcripts (SQLite) survive container restarts
+      - pi-data:/data
+      # Mount Teams MCP authentication tokens from host
+      - ~/.msgraph-mcp-auth.json:/root/.msgraph-mcp-auth.json
+      - ~/.teams-mcp-token-cache.json:/root/.teams-mcp-token-cache.json
+
+    # ── Real Pi audio passthrough ──────────────────────────────────────────────
+    # Required for record_worker.py (PyAudio) to see the mic when MOCK=false.
+    # Harmless on a dev laptop as long as /dev/snd exists; if it doesn't,
+    # comment this block back out and use MOCK=true instead.
+    # devices:
+    #   - /dev/snd:/dev/snd
+    # group_add:
+    #   - audio
+
+volumes:
+  pi-recordings:
+  pi-data:

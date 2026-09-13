@@ -1,0 +1,3633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMBot Premium — AI Meeting Orchestrator</title>
+
+  <!-- Set the theme before first paint so there's no flash of the wrong mode -->
+  <script>
+    (function () {
+      var saved = localStorage.getItem("pmbot-theme");
+      var theme = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+
+  <!-- Google Fonts: Inter carries every surface — UI, data, and headline moments alike (EVASION-style single-family system) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      /* Tokens ported 1:1 from evasion-clone/styles.css :root — same neutrals, same two text tones */
+      --font-display: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+      --font-body: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+      --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+      /* evasion --background / --muted / --border */
+      --bg-dark: #FFFFFF;
+      --bg-sidebar: #F5F5F5;
+      --bg-surface-hover: #EFEFEF;
+      --card-bg: #FFFFFF;
+      --border-color: #E5E5E5;
+      --border-color-strong: #E5E5E5;
+
+      /* evasion --foreground carries every primary action and selection state */
+      --accent-primary: #0A0A0A;
+      --accent-primary-hover: #2E2E2E;
+      --accent-primary-foreground: #FFFFFF;
+      --accent-primary-foreground-rgb: 255, 255, 255;
+
+      /* Semantic state colors — darkened for AA contrast on white, status only */
+      --accent-emerald: #047857;
+      --accent-amber: #B45309;
+      --accent-rose: #BE123C;
+      --accent-cyan: #0E7490;
+      --emerald-rgb: 4, 120, 87;
+      --amber-rgb: 180, 83, 9;
+      --rose-rgb: 190, 18, 60;
+      /* Fixed across both themes: the only rose value dark enough for white button text at AA (4.5:1).
+         --accent-rose itself brightens in dark mode for text/dot use against a dark page — too light to
+         also carry white text as a solid fill, so danger buttons use this instead. */
+      --accent-rose-solid: #BE123C;
+
+      /* evasion only ever defines two text tones: --foreground and --muted-foreground */
+      --text-white: #0A0A0A;
+      --text-slate: #737373;
+      --text-gray: #737373;
+      --text-muted: #737373;
+
+      /* evasion's exact header shadow, and its mobile-nav dropdown shadow for elevated surfaces */
+      --shadow-sm: 0 0 0 1px rgba(14,63,126,0.04), 0 1px 1px -0.5px rgba(42,51,70,0.04), 0 3px 3px -1.5px rgba(42,51,70,0.04), 0 6px 6px -3px rgba(42,51,70,0.04), 0 12px 12px -6px rgba(14,63,126,0.04);
+      --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.08);
+
+      /* Neutral ink wash + surface-tint RGB triplets — invert per theme so every rgba() overlay adapts */
+      --ink-rgb: 10, 10, 10;
+      --surface-rgb: 255, 255, 255;
+
+      --transition-speed: 0.2s;
+
+      /* Semantic z-index scale */
+      --z-sticky: 10;
+      --z-panel: 20;
+      --z-floating-bar: 30;
+      --z-drawer: 40;
+      --z-modal-backdrop: 90;
+      --z-modal: 100;
+      --z-toast: 110;
+    }
+
+    /* Dark mode — same paper-flat, flat-card, single-border-weight system, inverted.
+       Toggled via [data-theme] on <html>, set by the inline head script (below) to avoid a flash. */
+    :root[data-theme="dark"] {
+      --bg-dark: #0A0A0A;
+      --bg-sidebar: #141414;
+      --bg-surface-hover: #1F1F1F;
+      --card-bg: #0A0A0A;
+      --border-color: #2A2A2A;
+      --border-color-strong: #2A2A2A;
+
+      --accent-primary: #F2F2F2;
+      --accent-primary-hover: #D4D4D4;
+      --accent-primary-foreground: #0A0A0A;
+      --accent-primary-foreground-rgb: 10, 10, 10;
+
+      --accent-emerald: #34D399;
+      --accent-amber: #F59E0B;
+      --accent-rose: #F43F5E;
+      --accent-cyan: #22D3EE;
+      --emerald-rgb: 52, 211, 153;
+      --amber-rgb: 245, 158, 11;
+      --rose-rgb: 244, 63, 94;
+
+      --text-white: #F2F2F2;
+      --text-slate: #A3A3A3;
+      --text-gray: #A3A3A3;
+      --text-muted: #A3A3A3;
+
+      --shadow-sm: 0 0 0 1px rgba(255,255,255,0.06), 0 1px 1px -0.5px rgba(0,0,0,0.3), 0 3px 3px -1.5px rgba(0,0,0,0.3), 0 6px 6px -3px rgba(0,0,0,0.3), 0 12px 12px -6px rgba(0,0,0,0.3);
+      --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+      --ink-rgb: 245, 245, 245;
+      --surface-rgb: 10, 10, 10;
+    }
+
+    /* Modal backdrop stays a dark dimming scrim in both themes — never inverts with --ink-rgb */
+    :root[data-theme="dark"] .modal-overlay {
+      background: rgba(0, 0, 0, 0.65);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-dark);
+      color: var(--text-white);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    h1, h2, h3 {
+      text-wrap: balance;
+    }
+
+    /* Keyboard focus — on-brand ring for keyboard nav only, mouse/touch stay clean */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    label.toggle-switch:has(:focus-visible),
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+
+    /* The scrollable workspace region is keyboard-focusable (arrow/space scrolling); ring drawn
+       inward since it sits flush against an overflow:hidden ancestor with no room to halo outward */
+    .workspace-body:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: -2px;
+    }
+
+    /* Two Column Grid Layout: nav sidebar + workspace */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    @media (max-width: 900px) {
+      .app-layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        display: none; /* Hide left sidebar on mobile */
+      }
+      .sidebar.active-mobile {
+        display: flex;
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        width: 300px;
+        z-index: var(--z-drawer);
+        box-shadow: var(--shadow-lg);
+        animation: slideRight 0.3s ease-out;
+      }
+      .mobile-sidebar-backdrop.active {
+        display: block;
+      }
+    }
+
+    /* Dims the page behind the mobile nav drawer and gives it a click-outside-to-close target */
+    .mobile-sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(var(--ink-rgb), 0.4);
+      z-index: calc(var(--z-drawer) - 1);
+      animation: backdropFadeIn 0.2s ease;
+    }
+
+    /* LEFT SIDEBAR */
+    .sidebar {
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      padding: 1.75rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow-y: auto;
+      z-index: var(--z-panel);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      text-decoration: none;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--text-white);
+    }
+
+    .brand-logo {
+      background: var(--accent-primary);
+      width: 2.35rem;
+      height: 2.35rem;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--bg-dark);
+      flex-shrink: 0;
+    }
+
+    .brand-logo svg {
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text-white);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+
+    .brand-title span:last-child {
+      font-family: var(--font-body);
+      font-size: 0.66rem;
+      color: var(--text-gray);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 0.3rem;
+    }
+
+    /* Drag and Drop Zone */
+    .upload-zone {
+      border: 1.5px dashed var(--border-color-strong);
+      border-radius: 0;
+      padding: 1.25rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      background: transparent;
+      transition: all var(--transition-speed);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent-primary);
+      background: var(--bg-surface-hover);
+    }
+
+    .upload-zone svg {
+      width: 1.75rem;
+      height: 1.75rem;
+      color: var(--accent-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .upload-zone p {
+      font-size: 0.78rem;
+      color: var(--text-slate);
+      font-weight: 600;
+    }
+
+    .upload-zone span {
+      font-size: 0.68rem;
+      color: var(--text-gray);
+    }
+
+    /* Recording Button Styles */
+    .recording-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 0;
+    }
+
+    .rec-header {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-gray);
+      margin-bottom: 0.25rem;
+    }
+
+    /* Sidebar Navigation Links */
+    .nav-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .nav-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: transparent;
+      color: var(--text-slate);
+      text-decoration: none;
+      text-align: left;
+      border-radius: 0;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all var(--transition-speed);
+      cursor: pointer;
+      border: 1px solid transparent;
+      user-select: none;
+    }
+
+    .nav-menu-item:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-white);
+    }
+
+    .nav-menu-item.active {
+      background: var(--accent-primary);
+      border: 1px solid var(--accent-primary);
+      color: var(--accent-primary-foreground);
+    }
+
+    .nav-menu-item.active svg {
+      color: var(--accent-primary-foreground);
+    }
+
+    .nav-menu-item svg {
+      width: 1.1rem;
+      height: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    /* Recent Sessions List */
+    .recent-sessions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      flex: 1;
+      margin-top: 0.5rem;
+    }
+
+    .recent-sessions-header {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-gray);
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .recent-sessions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      overflow-y: auto;
+      max-height: 200px;
+    }
+
+    .recent-session-item {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 0;
+      padding: 0.6rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      cursor: pointer;
+      transition: all var(--transition-speed);
+    }
+
+    .recent-session-item:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-surface-hover);
+    }
+
+    .session-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      overflow: hidden;
+    }
+
+    .session-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-white);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .session-date {
+      font-size: 0.65rem;
+      color: var(--text-gray);
+    }
+
+    .session-status-badge {
+      font-size: 0.6rem;
+      font-weight: 600;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-approved {
+      background: transparent;
+      color: var(--accent-emerald);
+      border: 1px solid var(--accent-emerald);
+    }
+
+    .badge-review {
+      background: transparent;
+      color: var(--accent-amber);
+      border: 1px solid var(--accent-amber);
+    }
+
+    .sidebar-version {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-align: center;
+      border-top: 1px solid var(--border-color);
+      padding-top: 0.75rem;
+    }
+
+    /* CENTER WORKSPACE */
+    .center-workspace {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-dark);
+    }
+
+    /* Persistent Header — evasion's .site-header: floating rounded-full pill, blur(12px), same layered shadow */
+    .main-header {
+      margin: 1.25rem 1.5rem 0;
+      padding: 0.85rem 1.75rem;
+      border: none;
+      border-radius: 9999px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background-color: rgba(var(--surface-rgb), 0.8);
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.3s ease, background-color 0.3s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: var(--z-sticky);
+    }
+
+    .main-header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .menu-toggle-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-white);
+      cursor: pointer;
+    }
+
+    @media (max-width: 900px) {
+      .menu-toggle-btn {
+        display: block;
+      }
+    }
+
+    .header-title-text {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text-white);
+    }
+
+    .main-header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    /* Light / Dark mode toggle — icon-only pill, evasion's restrained accent language */
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.1rem;
+      height: 2.1rem;
+      flex-shrink: 0;
+      border: 1px solid var(--border-color);
+      border-radius: 9999px;
+      background: transparent;
+      color: var(--text-white);
+      cursor: pointer;
+      transition: background var(--transition-speed) ease, border-color var(--transition-speed) ease;
+    }
+
+    .theme-toggle:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--text-white);
+    }
+
+    .theme-toggle svg {
+      width: 1.05rem;
+      height: 1.05rem;
+    }
+
+    .theme-toggle .icon-sun { display: none; }
+    :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+    :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+
+    /* Status Dot Badge */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: transparent;
+      border: 1px solid var(--border-color-strong);
+      padding: 0.4rem 1rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--text-gray);
+      display: inline-block;
+    }
+
+    .status-idle .status-dot {
+      background-color: var(--text-gray);
+    }
+    .status-processing .status-dot {
+      background-color: var(--accent-amber);
+      animation: pulse 1.5s infinite;
+    }
+    .status-pending_approval .status-dot {
+      background-color: var(--accent-primary);
+      animation: pulse 2s infinite;
+    }
+    .status-recording .status-dot {
+      background-color: var(--accent-rose);
+      animation: pulse 1s infinite;
+    }
+    .status-error .status-dot {
+      background-color: var(--accent-rose);
+    }
+
+    /* Scrollable Center Workspace Body */
+    .workspace-body {
+      flex: 1;
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      padding-bottom: 90px; /* Spacer for sticky approval bar */
+    }
+
+    /* Views (Pages) */
+    .tab-view {
+      display: none;
+      width: 100%;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .tab-view.active {
+      display: block;
+    }
+
+    /* State Panels within Tab Views */
+    .state-panel {
+      display: none;
+      width: 100%;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .state-panel.active {
+      display: block;
+    }
+
+    .panel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: border-color var(--transition-speed);
+      scroll-margin-top: 2rem;
+    }
+
+    .panel-card:hover {
+      border-color: var(--text-white);
+    }
+
+    .panel-card-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border-color-strong);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: transparent;
+    }
+
+    .panel-card-title {
+      font-family: var(--font-body);
+      font-size: 0.92rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      letter-spacing: -0.01em;
+      color: var(--text-white);
+    }
+
+    .panel-card-title svg {
+      width: 1.1rem;
+      height: 1.1rem;
+      color: var(--text-white);
+    }
+
+    .panel-card-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Form Layouts */
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (min-width: 768px) {
+      .form-grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .form-element {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-element label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .input-field {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+      padding: 0.7rem 0.9rem;
+      color: var(--text-white);
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all var(--transition-speed);
+      width: 100%;
+    }
+
+    .input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(var(--ink-rgb), 0.12);
+      background: var(--bg-dark);
+    }
+
+    textarea.input-field {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    /* Buttons */
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.25rem;
+      border-radius: 0;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-speed) ease;
+      border: 1px solid transparent;
+      color: var(--text-white);
+      user-select: none;
+    }
+
+    .button svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Primary CTA is the one deliberate curve against an otherwise sharp system */
+    .button-primary {
+      background: var(--accent-primary);
+      color: var(--accent-primary-foreground);
+      border-radius: 999px;
+      box-shadow: none;
+    }
+
+    .button-primary:hover {
+      background: var(--accent-primary-hover);
+      opacity: 0.9;
+    }
+
+    .button-primary:active {
+      transform: translateY(1px);
+    }
+
+    .button-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color-strong);
+      color: var(--text-white);
+    }
+
+    .button-secondary:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--text-white);
+    }
+
+    .button-secondary.active {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: var(--accent-primary-foreground);
+    }
+
+    .button-danger {
+      background: var(--accent-rose-solid);
+      color: #FFFFFF;
+      border-radius: 999px;
+      box-shadow: none;
+    }
+
+    .button-danger:hover {
+      background: #9F1239;
+    }
+
+    /* Switch Toggles */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #D4D4D4;
+      transition: var(--transition-speed);
+      border-radius: 20px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #FFFFFF;
+      transition: var(--transition-speed);
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: var(--accent-primary);
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(18px);
+      background-color: var(--accent-primary-foreground);
+    }
+
+    /* Dark mode: dim the off-state track so it doesn't glare against a dark card */
+    :root[data-theme="dark"] .toggle-slider {
+      background-color: #3A3A3A;
+    }
+
+    /* Overview Section layout: Summary + Raw Transcript Side-by-Side */
+    .overview-content-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 1024px) {
+      .overview-content-layout {
+        grid-template-columns: 1.2fr 0.8fr;
+      }
+    }
+
+    /* Transcript Box */
+    .transcript-box {
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+      overflow: hidden;
+      background: var(--bg-sidebar);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .transcript-header {
+      background: transparent;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border-color-strong);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-gray);
+    }
+
+    .transcript-body {
+      padding: 1.25rem;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      color: var(--text-slate);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      max-height: 380px;
+      text-align: left;
+    }
+
+    /* ── Live meeting view ─────────────────────────────────────────────────
+       Built for a shared room screen: large transcript type, state readable
+       from across the room, controls grouped in one toolbar. */
+    [hidden] {
+      display: none !important;
+    }
+
+    .live-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .live-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border-color-strong);
+      background: var(--card-bg);
+    }
+
+    .live-toolbar-left,
+    .live-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-rose);
+      background: rgba(var(--rose-rgb), 0.08);
+      border: 1px solid rgba(var(--rose-rgb), 0.3);
+    }
+
+    .live-badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.2s infinite;
+    }
+
+    .live-badge.is-paused {
+      color: var(--accent-amber);
+      background: rgba(var(--amber-rgb), 0.08);
+      border-color: rgba(var(--amber-rgb), 0.3);
+    }
+
+    .live-badge.is-paused .live-badge-dot {
+      animation: none;
+    }
+
+    .live-clock {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-white);
+    }
+
+    .live-stt {
+      font-size: 0.8rem;
+      color: var(--text-gray);
+    }
+
+    .live-stt.is-ok { color: var(--accent-emerald); }
+    .live-stt.is-warn { color: var(--accent-amber); }
+    .live-stt.is-error { color: var(--accent-rose); }
+
+    .live-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    @media (min-width: 1024px) {
+      .live-grid {
+        grid-template-columns: minmax(0, 1fr) 280px;
+      }
+    }
+
+    .live-feed-card {
+      position: relative;
+      border: 1px solid var(--border-color-strong);
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .live-paused-banner {
+      padding: 0.6rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-amber);
+      background: rgba(var(--amber-rgb), 0.08);
+      border-bottom: 1px solid rgba(var(--amber-rgb), 0.3);
+    }
+
+    .live-feed {
+      height: calc(100vh - 260px);
+      min-height: 320px;
+      overflow-y: auto;
+      padding: 1.25rem 1.5rem 2rem;
+      scroll-behavior: smooth;
+    }
+
+    .live-feed-empty {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--text-gray);
+      font-size: 1rem;
+      padding: 1rem 0;
+    }
+
+    .live-listening-bars {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 18px;
+    }
+
+    .live-listening-bars span {
+      width: 3px;
+      background: var(--accent-rose);
+      animation: live-bars 1s ease-in-out infinite;
+    }
+
+    .live-listening-bars span:nth-child(2) { animation-delay: 0.15s; }
+    .live-listening-bars span:nth-child(3) { animation-delay: 0.3s; }
+    .live-listening-bars span:nth-child(4) { animation-delay: 0.45s; }
+
+    @keyframes live-bars {
+      0%, 100% { height: 4px; }
+      50% { height: 18px; }
+    }
+
+    .live-segment {
+      display: grid;
+      grid-template-columns: 3.5rem minmax(0, 1fr);
+      gap: 1rem;
+      padding: 0.55rem 0;
+      border-bottom: 1px solid var(--border-color);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .live-segment-time {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-gray);
+      padding-top: 0.3rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .live-segment-text {
+      font-size: 1.15rem;
+      line-height: 1.55;
+      color: var(--text-white);
+      overflow-wrap: anywhere;
+    }
+
+    .live-segment-partial {
+      border-bottom: none;
+    }
+
+    .live-segment-partial .live-segment-text {
+      color: var(--text-gray);
+      font-style: italic;
+    }
+
+    .live-segment-partial .live-segment-text::after {
+      content: "▍";
+      margin-left: 2px;
+      animation: pulse 1s infinite;
+      font-style: normal;
+    }
+
+    .live-jump {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.45rem 1rem;
+      border-radius: 999px;
+      border: none;
+      background: var(--accent-primary);
+      color: var(--accent-primary-foreground);
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .live-side-card {
+      border: 1px solid var(--border-color-strong);
+      background: var(--bg-sidebar);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      align-self: start;
+    }
+
+    .live-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin: 0;
+    }
+
+    .live-stats div {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .live-stats dt {
+      color: var(--text-gray);
+    }
+
+    .live-stats dd {
+      margin: 0;
+      font-weight: 600;
+      color: var(--text-white);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .live-side-hint {
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: var(--text-gray);
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .live-feed { height: 60vh; padding: 1rem; }
+      .live-segment { grid-template-columns: 1fr; gap: 0.15rem; }
+      .live-segment-time { padding-top: 0; }
+      .live-segment-text { font-size: 1rem; }
+    }
+
+    /* Work Items Layout */
+    .work-items-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .work-item-edit-card {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: opacity var(--transition-speed);
+    }
+
+    .work-item-edit-card.excluded {
+      opacity: 0.4;
+      background: var(--bg-sidebar);
+    }
+
+    /* Leading type indicator dot */
+    .type-indicator {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .type-indicator.type-task {
+      background: var(--accent-emerald);
+    }
+
+    .type-indicator.type-bug {
+      background: var(--accent-rose);
+    }
+
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .card-meta-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    @media (min-width: 768px) {
+      .card-meta-row {
+        grid-template-columns: 120px 1fr 1fr;
+      }
+      /* Three even columns — for rows where every field needs real width,
+         not the 120px column meant for a short value like "1 - High" */
+      .card-meta-row--even3 {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      /* Two even columns — for rows with only two fields, so the second isn't stranded
+         next to an unused third track */
+      .card-meta-row--even2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* General Diagnostic Health Metrics (Idle state) */
+    .diagnostics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+
+    .diagnostic-card {
+      background: transparent;
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .diagnostic-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .diagnostic-value {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 500;
+      color: var(--text-white);
+    }
+
+    .diagnostic-value span {
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      color: var(--accent-emerald);
+      font-weight: 600;
+      margin-left: 0.35rem;
+    }
+
+    /* Empty Welcome Dashboard */
+    .empty-dashboard {
+      text-align: center;
+      padding: 4.5rem 2rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+      box-shadow: none;
+      max-width: 720px;
+      margin: 2rem auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .empty-logo-pulse {
+      font-size: 1.75rem;
+      background: transparent;
+      color: var(--accent-primary);
+      border: 1.5px solid var(--text-white);
+      width: 4.5rem;
+      height: 4.5rem;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .empty-logo-pulse svg {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+
+    .pulse-ring-glow {
+      position: absolute;
+      width: 5.7rem;
+      height: 5.7rem;
+      border: 1.5px solid var(--accent-primary);
+      border-radius: 0;
+      animation: pulse-ring 3s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+      opacity: 0.25;
+    }
+
+    /* Waveform Recording Animation */
+    .waveform-visualizer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      height: 50px;
+      margin: 1.5rem 0;
+    }
+
+    .waveform-bar {
+      width: 4px;
+      height: 10px;
+      background: var(--accent-primary);
+      border-radius: 0;
+      animation: waveform-scale 1s ease-in-out infinite alternate;
+    }
+
+    .waveform-bar:nth-child(2) { animation-delay: 0.1s; height: 18px; }
+    .waveform-bar:nth-child(3) { animation-delay: 0.25s; height: 28px; }
+    .waveform-bar:nth-child(4) { animation-delay: 0.4s; height: 40px; }
+    .waveform-bar:nth-child(5) { animation-delay: 0.55s; height: 25px; }
+    .waveform-bar:nth-child(6) { animation-delay: 0.7s; height: 12px; }
+
+    /* Developer Log Console terminal — a deliberate dark surface against the light system */
+    .logs-panel-view {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .terminal-window {
+      background: #0A0A0A;
+      border: 1px solid #0A0A0A;
+      border-radius: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .terminal-header {
+      background: #000000;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.6rem 1.25rem;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .terminal-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    .td-red { background-color: #ef4444; }
+    .td-yellow { background-color: #eab308; }
+    .td-green { background-color: #22c55e; }
+
+    .terminal-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: #8A8A8A;
+      font-weight: 600;
+    }
+
+    .terminal-viewer {
+      padding: 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #38bdf8;
+      height: 480px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    /* Floating pending approval action bar */
+    .pending-action-bar {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      left: 320px; /* Aligned next to Left Sidebar */
+      background: rgba(var(--surface-rgb), 0.9);
+      backdrop-filter: blur(25px);
+      border-top: 1px solid var(--border-color-strong);
+      padding: 1rem 2rem;
+      z-index: var(--z-floating-bar);
+      display: none;
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: var(--shadow-lg);
+    }
+
+    @media (max-width: 900px) {
+      .pending-action-bar {
+        left: 0;
+      }
+    }
+
+    .pending-action-content {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .pending-action-message {
+      font-size: 0.8rem;
+      color: var(--text-slate);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pending-action-message svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      color: var(--accent-amber);
+    }
+
+    /* Historical View Warning Indicator */
+    .history-warning-bar {
+      background: transparent;
+      border: 1px solid var(--accent-cyan);
+      border-radius: 0;
+      padding: 0.75rem 1.25rem;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin-bottom: 1rem;
+    }
+
+    /* Modal Overlay Dialogs */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(var(--ink-rgb), 0.45);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: var(--z-modal);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--bg-dark);
+      border: 1px solid var(--text-white);
+      border-radius: 0;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border-color-strong);
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.2rem;
+      background: transparent;
+      letter-spacing: -0.01em;
+    }
+
+    .modal-body {
+      padding: 1.75rem;
+      max-height: 400px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .modal-footer {
+      padding: 1.25rem 1.75rem;
+      border-top: 1px solid var(--border-color-strong);
+      display: flex;
+      justify-content: flex-end;
+      background: transparent;
+    }
+
+    .sync-outcome-item {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      background: transparent;
+      border: 1px solid var(--border-color-strong);
+      border-radius: 0;
+    }
+
+    .outcome-status-icon {
+      font-size: 1.3rem;
+      align-self: flex-start;
+    }
+
+    .outcome-details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex: 1;
+      text-align: left;
+    }
+
+    .outcome-title {
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    .outcome-desc {
+      font-size: 0.8rem;
+      color: var(--text-gray);
+      line-height: 1.5;
+    }
+
+    .outcome-link {
+      color: var(--text-white);
+      font-size: 0.8rem;
+      text-decoration: none;
+      margin-top: 0.25rem;
+      align-self: flex-start;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--text-white);
+    }
+
+    .outcome-link:hover {
+      opacity: 0.6;
+    }
+
+    /* Keyframe Animations */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.9); opacity: 0.4; }
+      50% { transform: scale(1.05); opacity: 0.2; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+    @keyframes waveform-scale {
+      0% { transform: scaleY(0.3); }
+      100% { transform: scaleY(1.1); }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    @keyframes slideRight {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(0); }
+    }
+    /* evasion's .reveal rises 28px on entrance — same distance, tuned to a snappier duration for app-speed tab switches */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes backdropFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes scaleUp {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Reduced motion: keep functional spinners, drop decorative/entrance motion */
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-ring-glow,
+      .status-dot,
+      .waveform-bar,
+      .tab-view.active,
+      .state-panel.active,
+      .sidebar.active-mobile,
+      .mobile-sidebar-backdrop,
+      .pending-action-bar,
+      .modal {
+        animation: none !important;
+      }
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(var(--ink-rgb), 0.16);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(var(--ink-rgb), 0.3);
+    }
+  </style>
+</head>
+<body class="status-idle">
+
+  <div class="app-layout">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="sidebar">
+      <a class="brand" href="#">
+        <div class="brand-logo">
+          <!-- Animated Mic SVG -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+        </div>
+        <div class="brand-title">
+          <span>PMBot Premium</span>
+          <span>AI Meeting Assistant</span>
+        </div>
+      </a>
+      
+      <!-- WAV File Drop Zone -->
+      <div id="uploadDropZone" class="upload-zone" role="button" tabindex="0" aria-label="Upload meeting audio: drag and drop a .wav file, or press Enter to browse">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>Upload Meeting Audio</p>
+        <span>Drag & drop .wav file or browse</span>
+        <input type="file" id="uploadFileInput" accept=".wav" style="display: none;">
+      </div>
+
+      <!-- Live Recording controls -->
+      <div class="recording-section">
+        <span class="rec-header">Microphone Control</span>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btnRecordStart" class="button button-secondary" style="flex: 1; padding: 0.5rem; font-size: 0.75rem;" onclick="startRecording()">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" style="color: var(--accent-rose); width: 0.75rem; height: 0.75rem;"><circle cx="12" cy="12" r="10"/></svg>
+            Record
+          </button>
+          <button id="btnRecordStop" class="button button-danger" style="flex: 1; padding: 0.5rem; font-size: 0.75rem; display: none;" onclick="stopRecording()">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width: 0.75rem; height: 0.75rem;"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Stop
+          </button>
+        </div>
+      </div>
+      
+      <!-- Nav Menu -->
+      <nav class="nav-menu">
+        <span class="rec-header" style="margin-left: 0.5rem;">Workspace Views</span>
+        <button type="button" class="nav-menu-item active" data-tab="overview" onclick="setTab('overview')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          Meeting Dashboard
+        </button>
+        <button type="button" class="nav-menu-item" data-tab="teams" id="navTeams" onclick="setTab('teams')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          </svg>
+          Teams Publisher
+        </button>
+        <button type="button" class="nav-menu-item" data-tab="azure" id="navAzure" onclick="setTab('azure')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            <circle cx="18" cy="6" r="3"/>
+          </svg>
+          Azure DevOps Sync
+          <span id="badgeAzureCount" class="nav-badge" style="display: none; margin-left: auto; background: var(--accent-primary); color: var(--accent-primary-foreground); font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 0; font-weight: 600;">0</span>
+        </button>
+        <button type="button" class="nav-menu-item" data-tab="logs" onclick="setTab('logs')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          System Logs
+        </button>
+      </nav>
+
+      <!-- Recent Sessions (Persistent History) -->
+      <div class="recent-sessions">
+        <span class="recent-sessions-header">Recent Sessions</span>
+        <div id="recentSessionsList" class="recent-sessions-list">
+          <!-- Dynamic history rows -->
+        </div>
+      </div>
+
+      <div class="sidebar-version">
+        PMBot Premium v2.0.0
+      </div>
+    </aside>
+
+    <!-- Dims the workspace and closes the drawer on click, while it's open on mobile -->
+    <div id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop" onclick="toggleMobileSidebar()"></div>
+
+    <!-- CENTER WORKSPACE -->
+    <main class="center-workspace">
+      
+      <!-- Top Persistent Header -->
+      <header class="main-header">
+        <div class="main-header-left">
+          <button class="menu-toggle-btn" onclick="toggleMobileSidebar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.5rem; height: 1.5rem;"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span id="headerPageTitle" class="header-title-text">Meeting Dashboard</span>
+        </div>
+        
+        <div class="main-header-right">
+          <!-- Light / Dark mode toggle -->
+          <button id="themeToggle" class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="4"/>
+              <line x1="12" y1="20" x2="12" y2="22"/>
+              <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+              <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+              <line x1="2" y1="12" x2="4" y2="12"/>
+              <line x1="20" y1="12" x2="22" y2="12"/>
+              <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+              <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+
+          <!-- Status Indicator -->
+          <div id="statusBadge" class="status-badge">
+            <span class="status-dot"></span>
+            <span id="statusText">Idle</span>
+          </div>
+</div>
+      </header>
+
+      <!-- Scrollable workspace body -->
+      <div class="workspace-body">
+
+        <!-- Historical Session Viewing Indicator -->
+        <div id="viewingHistoryIndicator" class="history-warning-bar">
+          <span style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 1.15rem; height: 1.15rem;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Viewing archived session history (Read-Only)
+          </span>
+          <button class="button button-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.75rem;" onclick="dismissHistoryView()">Close Archive</button>
+        </div>
+
+        <!-- ──────────────── PAGE 1: MEETING DASHBOARD / OVERVIEW ──────────────── -->
+        <div id="view-overview" class="tab-view active">
+          
+          <!-- STATE 1: IDLE / WELCOME PANEL -->
+          <div id="panelIdle" class="state-panel active">
+            <div class="empty-dashboard">
+              <div class="empty-logo-pulse">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+              </div>
+              <h2 style="font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; letter-spacing: -0.01em;">Awaiting Meeting Audio</h2>
+              <p style="color: var(--text-gray); font-size: 0.9rem; max-width: 460px; margin: 0 auto;">
+                Drop a `.wav` file into the upload zone on the sidebar, or click **Record** to stream live mic audio from the Pi hardware.
+              </p>
+              <p style="font-size: 0.78rem; color: var(--accent-primary); font-weight: 600; background: rgba(var(--ink-rgb), 0.05); padding: 0.4rem 1rem; border-radius: 999px; border: 1px solid rgba(var(--ink-rgb), 0.15);">
+                Auto-polling backend agent is active...
+              </p>
+
+              <!-- Diagnostics dashboard -->
+              <div style="width: 100%; margin-top: 2rem;">
+                <span class="rec-header" style="text-align: left; display: block;">System Diagnostics</span>
+                <div class="diagnostics-grid">
+                  <div class="diagnostic-card">
+                    <span class="diagnostic-label">Microphone Status</span>
+                    <span class="diagnostic-value">Active<span>OK</span></span>
+                  </div>
+                  <div class="diagnostic-card">
+                    <span class="diagnostic-label">PulseAudio Bridge</span>
+                    <span class="diagnostic-value">Connected<span>1321</span></span>
+                  </div>
+                  <div class="diagnostic-card">
+                    <span class="diagnostic-label">Speech-to-Text</span>
+                    <span class="diagnostic-value">Sarvam<span>v3</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATE 2: RECORDING PANEL -->
+          <div id="panelRecording" class="state-panel">
+            <div class="live-layout">
+              <!-- Live toolbar: state, clock, transcription health, controls -->
+              <div class="live-toolbar">
+                <div class="live-toolbar-left">
+                  <span id="liveBadge" class="live-badge"><span class="live-badge-dot"></span><span id="liveBadgeText">Live</span></span>
+                  <span id="liveClock" class="live-clock" aria-label="Meeting duration">00:00</span>
+                  <span id="liveSttState" class="live-stt" title="Speech-to-text connection">Transcription: waiting for audio</span>
+                </div>
+                <div class="live-toolbar-right">
+                  <button id="btnLivePause" class="button button-secondary" type="button" onclick="toggleLivePause()">
+                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    <span id="btnLivePauseText">Pause</span>
+                  </button>
+                  <button class="button button-danger" type="button" onclick="stopRecording()">
+                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                    End & Summarise
+                  </button>
+                </div>
+              </div>
+
+              <div class="live-grid">
+                <!-- Transcript feed -->
+                <section class="live-feed-card" aria-label="Live transcript">
+                  <div id="livePausedBanner" class="live-paused-banner" hidden>
+                    Paused — the microphone is not being captured. Resume to continue the transcript.
+                  </div>
+                  <div id="liveFeed" class="live-feed" aria-live="polite">
+                    <div id="liveFeedEmpty" class="live-feed-empty">
+                      <span class="live-listening-bars" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                      Listening… the transcript appears here as people speak.
+                    </div>
+                    <div id="liveSegments"></div>
+                    <div id="livePartial" class="live-segment live-segment-partial" hidden>
+                      <span class="live-segment-time">…</span>
+                      <span class="live-segment-text"></span>
+                    </div>
+                  </div>
+                  <button id="liveJumpBtn" class="live-jump" type="button" onclick="scrollLiveToBottom(true)" hidden>↓ Jump to live</button>
+                </section>
+
+                <!-- Session facts (live notes replace this in phase 2) -->
+                <aside class="live-side-card" aria-label="Session details">
+                  <span class="rec-header">This Meeting</span>
+                  <dl class="live-stats">
+                    <div><dt>Started</dt><dd id="liveStatStarted">—</dd></div>
+                    <div><dt>Utterances</dt><dd id="liveStatLines">0</dd></div>
+                    <div><dt>Words</dt><dd id="liveStatWords">0</dd></div>
+                    <div><dt>Languages</dt><dd id="liveStatLangs">—</dd></div>
+                    <div><dt>Source</dt><dd id="liveStatSource">—</dd></div>
+                  </dl>
+                  <p class="live-side-hint">Everything said is saved as it's transcribed. Ending the meeting sends the full transcript for summary and action items.</p>
+                </aside>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATE 3: PROCESSING PANEL -->
+          <div id="panelProcessing" class="state-panel">
+            <div class="empty-dashboard" style="border-color: rgba(var(--amber-rgb), 0.15);">
+              <div class="spinner" style="width: 3.5rem; height: 3.5rem; border: 4px solid rgba(var(--amber-rgb), 0.05); border-left-color: var(--accent-amber); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              <h2 style="font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; color: var(--accent-amber);">AI Orchestration Running</h2>
+              <p style="color: var(--text-gray); font-size: 0.9rem; max-width: 440px; margin: 0 auto;">
+                Transcribing audio with Sarvam STT and routing through the OpenRouter LLM to extract meeting briefs, decisions, and DevOps tickets.
+              </p>
+            </div>
+          </div>
+
+          <!-- STATE 4: ERROR PANEL -->
+          <div id="panelError" class="state-panel">
+            <div class="empty-dashboard" style="border-color: rgba(var(--rose-rgb), 0.35);">
+              <div class="empty-logo-pulse" style="color: var(--accent-rose); border-color: rgba(var(--rose-rgb), 0.3); background: rgba(var(--rose-rgb), 0.05);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <h2 style="font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; color: var(--accent-rose);">Processing Interrupted</h2>
+              <p id="errorDetails" style="color: var(--text-slate); font-size: 0.88rem; max-width: 480px;"></p>
+              <button class="button button-secondary" style="margin-top: 0.5rem;" onclick="dismissPending()">
+                Reset Dashboard State
+              </button>
+            </div>
+          </div>
+
+          <!-- STATE 5: PENDING APPROVAL WORKSPACE (OVERVIEW & TRANSCRIPT ONLY) -->
+          <div id="panelPendingOverview" class="state-panel">
+            <div class="overview-content-layout">
+              <!-- Brief Card -->
+              <div class="panel-card">
+                <div class="panel-card-header">
+                  <span class="panel-card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    Executive Summary
+                  </span>
+                </div>
+                
+                <div class="panel-card-body">
+                  <!-- Sync Integration Status Badges -->
+                  <div class="sync-status-banner" style="display: flex; gap: 1rem; margin-bottom: 1.25rem; padding: 0.65rem 1rem; background: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 0; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <span style="font-size: 0.75rem; color: var(--text-gray); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Integrations Status</span>
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                      <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem;">
+                        <span id="statusBadgeTeamsIcon" style="font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; width: 0.9rem; height: 0.9rem; border-radius: 50%;">⚪</span>
+                        <span id="statusBadgeTeamsText" style="font-weight: 500; color: var(--text-gray);">Teams: Pending</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem;">
+                        <span id="statusBadgeAzureIcon" style="font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center; width: 0.9rem; height: 0.9rem; border-radius: 50%;">⚪</span>
+                        <span id="statusBadgeAzureText" style="font-weight: 500; color: var(--text-gray);">Azure DevOps: Pending</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-element">
+                    <label>Session Meeting Title</label>
+                    <input type="text" id="overviewTitle" class="input-field" style="font-weight: 600; font-size: 1rem; font-family: var(--font-display);" placeholder="Enter meeting title..." oninput="syncOverviewToForms()">
+                  </div>
+
+                  <div class="form-element">
+                    <label>Summary Description</label>
+                    <textarea id="overviewText" class="input-field" style="min-height: 110px;" placeholder="Write a summary..." oninput="syncOverviewToForms()"></textarea>
+                  </div>
+
+                  <div class="form-grid-2">
+                    <div class="form-element">
+                      <label>Attendees</label>
+                      <input type="text" id="overviewAttendees" class="input-field" placeholder="Asha, Vikram..." oninput="syncOverviewToForms()">
+                    </div>
+                    <div class="form-element">
+                      <label>Next Meeting date</label>
+                      <input type="text" id="overviewNextMeeting" class="input-field" placeholder="E.g., Next Monday..." oninput="syncOverviewToForms()">
+                    </div>
+                  </div>
+
+                  <div class="form-element">
+                    <label>Key Decisions (One decision per line)</label>
+                    <textarea id="overviewDecisions" class="input-field" style="min-height: 80px;" placeholder="Add decisions made..." oninput="syncOverviewToForms()"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Raw Transcript Card -->
+              <div class="transcript-box">
+                <div class="transcript-header">
+                  <span>RAW MEETING TRANSCRIPT</span>
+                  <button class="button button-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.68rem; height: auto;" onclick="copyTranscriptToClipboard()">
+                    Copy Raw
+                  </button>
+                </div>
+                <pre id="transcriptText" class="transcript-body">Transcript text will stream here...</pre>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ──────────────── PAGE 2: TEAMS PUBLISHER ──────────────── -->
+        <div id="view-teams" class="tab-view">
+          
+          <!-- Active Form Panel -->
+          <div id="teamsActiveForm" style="display: none;">
+            <div class="panel-card">
+              <div class="panel-card-header">
+                <span class="panel-card-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  Microsoft Teams Notification Settings
+                </span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="teamsToggle" checked onchange="toggleTeamsSection()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              
+              <div class="panel-card-body" id="teamsFormBody">
+                <p style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 0.25rem;">
+                  This summary will be posted as an **Adaptive Card** to the channel configured in `.env` upon approval.
+                </p>
+
+                <div class="form-element">
+                  <label>Teams Header Title</label>
+                  <input type="text" id="summaryTitle" class="input-field" oninput="syncFormsToOverview()">
+                </div>
+
+                <div class="form-element">
+                  <label>Teams Summary Text</label>
+                  <textarea id="summaryText" class="input-field" style="min-height: 110px;" oninput="syncFormsToOverview()"></textarea>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-element">
+                    <label>Attendees</label>
+                    <input type="text" id="summaryAttendees" class="input-field" oninput="syncFormsToOverview()">
+                  </div>
+                  <div class="form-element">
+                    <label>Next Meeting</label>
+                    <input type="text" id="summaryNextMeeting" class="input-field" oninput="syncFormsToOverview()">
+                  </div>
+                </div>
+
+                <div class="form-element">
+                  <label>Decisions Posted (One per line)</label>
+                  <textarea id="summaryDecisions" class="input-field" style="min-height: 90px;" oninput="syncFormsToOverview()"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State Panel -->
+          <div id="teamsEmptyState" class="empty-dashboard">
+            <div class="empty-logo-pulse" style="color: var(--accent-primary); border-color: rgba(var(--ink-rgb), 0.15); background: rgba(var(--ink-rgb), 0.02);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <h2 style="font-family: var(--font-display); font-weight: 600; font-size: 1.35rem;">No Active Meeting Summary</h2>
+            <p style="color: var(--text-gray); font-size: 0.9rem; max-width: 440px;">
+              Publishing options will be activated once a meeting transcript has been processed and is ready for review.
+            </p>
+          </div>
+
+        </div>
+
+        <!-- ──────────────── PAGE 3: AZURE DEVOPS SYNC ──────────────── -->
+        <div id="view-azure" class="tab-view">
+          
+          <!-- Active list panel -->
+          <div id="azureActiveForm" style="display: none;">
+            <div class="panel-card">
+              <div class="panel-card-header">
+                <span class="panel-card-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><circle cx="18" cy="6" r="3"/></svg>
+                  Azure DevOps Action Tickets
+                </span>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                  <span id="itemsCounter" style="font-size: 0.78rem; color: var(--text-gray); font-weight: 600;">0 approved / 0 total</span>
+                  <button class="button button-secondary" style="padding: 0.45rem 0.8rem; font-size: 0.78rem;" onclick="addWorkItem()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 0.85rem; height: 0.85rem; margin-right: 0.2rem;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Item
+                  </button>
+                </div>
+              </div>
+              
+              <div class="panel-card-body">
+                <div id="workItemsList" class="work-items-container">
+                  <!-- Dynamic cards -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State Panel -->
+          <div id="azureEmptyState" class="empty-dashboard">
+            <div class="empty-logo-pulse" style="color: var(--accent-primary); border-color: rgba(var(--ink-rgb), 0.15); background: rgba(var(--ink-rgb), 0.02);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/><circle cx="18" cy="6" r="3"/>
+              </svg>
+            </div>
+            <h2 style="font-family: var(--font-display); font-weight: 600; font-size: 1.35rem;">No Pending Action Items</h2>
+            <p style="color: var(--text-gray); font-size: 0.9rem; max-width: 440px;">
+              Action item routing and Azure DevOps synchronization parameters will be active when a meeting session is waiting for approval.
+            </p>
+          </div>
+
+        </div>
+
+        <!-- ──────────────── PAGE 4: SYSTEM LOGS CONSOLE ──────────────── -->
+        <div id="view-logs" class="tab-view">
+          <div class="logs-panel-view">
+            <div class="panel-card">
+              <div class="panel-card-header">
+                <span class="panel-card-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  Live System Log Console
+                </span>
+              </div>
+              <div class="panel-card-body">
+                <div style="display: flex; gap: 0.5rem; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; flex-wrap: wrap;">
+                  <button id="btnTabWorker" class="button button-secondary active" onclick="selectLogTab('worker')" style="font-size: 0.78rem; padding: 0.45rem 1rem;">Worker Logs (Audio/Recording)</button>
+                  <button id="btnTabServer" class="button button-secondary" onclick="selectLogTab('server')" style="font-size: 0.78rem; padding: 0.45rem 1rem;">Server Logs (FastAPI Backend)</button>
+                  <button class="button button-secondary" onclick="fetchLogs()" style="margin-left: auto; font-size: 0.78rem; padding: 0.45rem 1rem;">
+                    🔄 Refresh
+                  </button>
+                </div>
+
+                <div class="terminal-window">
+                  <div class="terminal-header">
+                    <div class="terminal-dots">
+                      <span class="terminal-dot td-red"></span>
+                      <span class="terminal-dot td-yellow"></span>
+                      <span class="terminal-dot td-green"></span>
+                    </div>
+                    <span class="terminal-title">bash - Supervisor Stream</span>
+                  </div>
+                  <pre id="logsViewer" class="terminal-viewer">Loading system logs...</pre>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-gray); align-items: center; margin-top: 0.25rem;">
+                  <span>Auto-polling logs every 2 seconds.</span>
+                  <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                    <input type="checkbox" id="chkAutoscroll" checked> Auto-scroll to bottom
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Unified Approval Bottom Floating Bar -->
+      <div id="pendingActionBar" class="pending-action-bar">
+        <div class="pending-action-content">
+          <div class="pending-action-message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span id="pendingActionText"><strong>Meeting review pending.</strong> Review decisions, Teams post, and DevOps tickets.</span>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <button class="button button-secondary" style="border-color: rgba(var(--rose-rgb), 0.25); color: var(--accent-rose);" onclick="dismissPending()">Reject / Dismiss</button>
+            <button id="btnApproveAction" class="button button-primary" onclick="confirmApproval()">
+              <span id="approveActionText">Approve & Sync Details</span>
+              <span id="confirmSpinner" class="spinner" style="display: none; width: 0.85rem; height: 0.85rem; border-width: 2px; border-color: rgba(var(--accent-primary-foreground-rgb), 0.3); border-left-color: var(--accent-primary-foreground); border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+</div>
+
+  <!-- Outcome Dialog Overlay -->
+  <div id="outcomeModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Publishing Sync Outcomes</span>
+      </div>
+      <div class="modal-body" id="outcomeBody">
+        <!-- Dynamic outcome list items -->
+      </div>
+      <div class="modal-footer">
+        <button class="button button-primary" onclick="closeOutcomeModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Light / dark mode — persisted choice, falls back to OS preference (initial value already
+    // set synchronously by the inline head script to avoid a flash of the wrong theme).
+    function applyTheme(theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("pmbot-theme", theme);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      applyTheme(current === "dark" ? "light" : "dark");
+    }
+
+    // State management
+    let pollInterval = null;
+    let logsInterval = null;
+    let currentSessionData = null;
+    let localWorkItems = []; 
+    let viewingHistory = false;
+
+    function normalizeWorkItem(item, index) {
+      return {
+        id: index,
+        included: item.included !== false,
+        type: item.type || "Task",
+        title: item.title || "",
+        description: item.description || "",
+        priority: item.priority || "",
+        assigned_to: item.assigned_to || "",
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        area_path: item.area_path || "",
+        iteration_path: item.iteration_path || "",
+        due_date: item.due_date || ""
+      };
+    }
+
+    let currentTab = "overview";
+    let currentLogTab = "worker";
+    let cachedLogs = { server: "No server logs cached.", worker: "No worker logs cached." };
+    let lastSyncType = "overview";
+    let teamsPublished = false;
+    let azureSynced = false;
+
+    // Initial load
+    document.addEventListener("DOMContentLoaded", () => {
+      // Read hash from URL to determine starting view
+      const hash = window.location.hash.replace("#", "") || "overview";
+      setTab(hash);
+      
+      // Load and render persistent history
+      renderRecentSessions();
+
+      // Set up drag and drop file upload listeners
+      setupFileUpload();
+      
+      startPolling();
+    });
+
+    // Hash change handler
+    window.addEventListener("hashchange", () => {
+      const hash = window.location.hash.replace("#", "") || "overview";
+      if (hash !== currentTab) {
+        setTab(hash);
+      }
+    });
+
+    // View Routing tab switcher (Different Pages/Views)
+    function setTab(tab) {
+      currentTab = tab;
+      window.location.hash = tab;
+
+      // Update header title
+      const titleElement = document.getElementById("headerPageTitle");
+      if (tab === "overview") titleElement.innerText = "Meeting Dashboard";
+      else if (tab === "teams") titleElement.innerText = "Teams Summary Publisher";
+      else if (tab === "azure") titleElement.innerText = "Azure DevOps Sync";
+      else if (tab === "logs") titleElement.innerText = "System Logs Console";
+
+      // Toggle active link class in nav
+      document.querySelectorAll(".nav-menu-item").forEach(el => {
+        el.classList.toggle("active", el.getAttribute("data-tab") === tab);
+      });
+
+      // Toggle display of view divs (Each view is a different page)
+      document.querySelectorAll(".tab-view").forEach(el => {
+        el.classList.remove("active");
+      });
+      
+      const activeView = document.getElementById(`view-${tab}`);
+      if (activeView) {
+        activeView.classList.add("active");
+      }
+
+      // Reset approval button state and show appropriate text based on page
+      const btn = document.getElementById("btnApproveAction");
+      if (btn) {
+        btn.disabled = false;
+        btn.style.background = "";
+        btn.style.borderColor = "";
+        btn.style.color = "";
+        btn.style.opacity = "";
+      }
+
+      const actionBar = document.getElementById("pendingActionBar");
+      const pendingText = document.getElementById("pendingActionText");
+      const approveText = document.getElementById("approveActionText");
+
+      if (tab === "overview") {
+        if (pendingText) pendingText.innerHTML = "<strong>Review complete?</strong> Save the session and reset the dashboard.";
+        if (approveText) approveText.innerText = "Archive & Close Session";
+      } else if (tab === "teams") {
+        const teamsActive = document.getElementById("teamsToggle") ? document.getElementById("teamsToggle").checked : true;
+        if (pendingText) pendingText.innerHTML = "<strong>Teams Publisher:</strong> Post the summary card to Microsoft Teams.";
+        if (approveText) approveText.innerText = teamsPublished ? "Teams Published ✓" : "Publish to Teams";
+        if (teamsPublished && btn) {
+          btn.disabled = true;
+          btn.style.background = 'rgba(var(--emerald-rgb), 0.2)';
+          btn.style.borderColor = 'var(--accent-emerald)';
+          btn.style.color = 'var(--accent-emerald)';
+        } else if (!teamsActive && btn) {
+          btn.disabled = true;
+          btn.style.opacity = "0.5";
+        }
+      } else if (tab === "azure") {
+        if (pendingText) pendingText.innerHTML = "<strong>Azure DevOps:</strong> Sync all active action items to backlog.";
+        if (approveText) approveText.innerText = azureSynced ? "Azure Synced ✓" : "Sync to Azure DevOps";
+        if (azureSynced && btn) {
+          btn.disabled = true;
+          btn.style.background = 'rgba(var(--emerald-rgb), 0.2)';
+          btn.style.borderColor = 'var(--accent-emerald)';
+          btn.style.color = 'var(--accent-emerald)';
+        }
+      }
+
+      // Hide or show bottom approval action bar based on current tab and session status
+      const status = document.body.className.replace("status-", "");
+      if (status === "pending_approval" && tab !== "logs") {
+        actionBar.style.display = "flex";
+      } else {
+        actionBar.style.display = "none";
+      }
+
+      // Manage logs polling interval
+      if (tab === "logs") {
+        fetchLogs();
+        if (!logsInterval) {
+          logsInterval = setInterval(fetchLogs, 2000);
+        }
+      } else {
+        if (logsInterval) {
+          clearInterval(logsInterval);
+          logsInterval = null;
+        }
+      }
+
+      // Scroll view body back to top when switching pages
+      const body = document.querySelector(".workspace-body");
+      if (body) body.scrollTop = 0;
+      updateSyncStatusBadges();
+    }
+
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      checkPendingStatus();
+      // Fast enough that wake-word "recording" shows Stop within ~1s
+      pollInterval = setInterval(checkPendingStatus, 1500);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    async function checkPendingStatus() {
+      try {
+        const response = await fetch("/api/transcript/pending");
+        if (response.ok) {
+          const data = await response.json();
+          updateDashboardState(data);
+        }
+      } catch (err) {
+        console.error("Failed to connect to server:", err);
+      }
+    }
+
+    function updateDashboardState(data) {
+      if (!data) data = { status: "idle" };
+      const status = data.status || "idle";
+
+      // While browsing archive history, ignore live idle overwrites — but still
+      // surface wake-word recording / processing so Stop can appear.
+      if (viewingHistory && status !== "pending_approval") {
+        if (status === "recording" || status === "processing" || status === "error") {
+          viewingHistory = false;
+          const histBar = document.getElementById("viewingHistoryIndicator");
+          if (histBar) histBar.style.display = "none";
+        } else {
+          return;
+        }
+      }
+
+      // Always keep polling so wake-word recording can surface Stop after a review session.
+      if (!pollInterval) {
+        pollInterval = setInterval(checkPendingStatus, 1500);
+      }
+      
+      // Update body class for conditional styles
+      document.body.className = `status-${status}`;
+      
+      const statusText = document.getElementById("statusText");
+      const btnStart = document.getElementById("btnRecordStart");
+      const btnStop = document.getElementById("btnRecordStop");
+      const actionBar = document.getElementById("pendingActionBar");
+
+      // Handle active state panel on Overview Page
+      showPanel("panelIdle"); // default fallback
+
+      if (status === "idle") {
+        statusText.innerText = "Idle";
+        if (btnStart) {
+          btnStart.style.display = "inline-flex";
+          btnStart.disabled = false;
+        }
+        if (btnStop) btnStop.style.display = "none";
+        if (actionBar) actionBar.style.display = "none";
+        
+        showPanel("panelIdle");
+        
+        document.getElementById("teamsActiveForm").style.display = "none";
+        document.getElementById("teamsEmptyState").style.display = "flex";
+        
+        document.getElementById("azureActiveForm").style.display = "none";
+        document.getElementById("azureEmptyState").style.display = "flex";
+        
+        document.getElementById("badgeAzureCount").style.display = "none";
+        
+      } else if (status === "recording") {
+        statusText.innerText = "Recording";
+        if (btnStart) btnStart.style.display = "none";
+        if (btnStop) btnStop.style.display = "inline-flex";
+        if (actionBar) actionBar.style.display = "none";
+        
+        showPanel("panelRecording");
+        // The feed has no height while hidden, so re-pin it once it's visible.
+        requestAnimationFrame(() => scrollLiveToBottom(false));
+
+        document.getElementById("teamsActiveForm").style.display = "none";
+        document.getElementById("teamsEmptyState").style.display = "flex";
+        
+        document.getElementById("azureActiveForm").style.display = "none";
+        document.getElementById("azureEmptyState").style.display = "flex";
+        
+        document.getElementById("badgeAzureCount").style.display = "none";
+        
+      } else if (status === "processing") {
+        statusText.innerText = "Processing AI";
+        // Keep Record visible-but-disabled rather than hiding both buttons — an empty
+        // bordered box where the control used to be reads as broken, not "unavailable".
+        if (btnStart) {
+          btnStart.style.display = "inline-flex";
+          btnStart.disabled = true;
+        }
+        if (btnStop) btnStop.style.display = "none";
+        if (actionBar) actionBar.style.display = "none";
+        
+        showPanel("panelProcessing");
+        
+        document.getElementById("teamsActiveForm").style.display = "none";
+        document.getElementById("teamsEmptyState").style.display = "flex";
+        
+        document.getElementById("azureActiveForm").style.display = "none";
+        document.getElementById("azureEmptyState").style.display = "flex";
+        
+        document.getElementById("badgeAzureCount").style.display = "none";
+        
+      } else if (status === "error") {
+        statusText.innerText = "Error";
+        document.getElementById("errorDetails").innerText = data.error || "An unknown LLM error occurred.";
+        if (btnStart) {
+          btnStart.style.display = "inline-flex";
+          btnStart.disabled = true;
+        }
+        if (btnStop) btnStop.style.display = "none";
+        if (actionBar) actionBar.style.display = "none";
+        
+        showPanel("panelError");
+        
+        document.getElementById("teamsActiveForm").style.display = "none";
+        document.getElementById("teamsEmptyState").style.display = "flex";
+        
+        document.getElementById("azureActiveForm").style.display = "none";
+        document.getElementById("azureEmptyState").style.display = "flex";
+        
+        document.getElementById("badgeAzureCount").style.display = "none";
+        
+      } else if (status === "pending_approval") {
+        statusText.innerText = "Review Session";
+        // Same reasoning as "processing": a disabled Record beats an empty box.
+        if (btnStart) {
+          btnStart.style.display = "inline-flex";
+          btnStart.disabled = true;
+        }
+        if (btnStop) btnStop.style.display = "none";
+        
+        // Show floating approval bar (if not viewing System Logs)
+        if (actionBar) {
+          if (currentTab !== "logs") {
+            actionBar.style.display = "flex";
+          } else {
+            actionBar.style.display = "none";
+          }
+        }
+        
+        // Activate Form Views and hide empty states
+        document.getElementById("teamsActiveForm").style.display = "block";
+        document.getElementById("teamsEmptyState").style.display = "none";
+        
+        document.getElementById("azureActiveForm").style.display = "block";
+        document.getElementById("azureEmptyState").style.display = "none";
+        
+        // Populate inputs if this is a newly received session
+        if (!currentSessionData || currentSessionData.transcript !== data.transcript) {
+          currentSessionData = data;
+          loadPendingForm(data);
+          // Auto save to history list as review pending
+          saveSessionToHistory(data);
+          setTab("overview");
+        }
+        
+        showPanel("panelPendingOverview");
+        
+        // Update work item badge count
+        const activeCount = localWorkItems.filter(item => item.included).length;
+        const badge = document.getElementById("badgeAzureCount");
+        if (activeCount > 0) {
+          badge.innerText = activeCount;
+          badge.style.display = "inline-block";
+        } else {
+          badge.style.display = "none";
+        }
+        // Keep polling — wake-word may start a new recording while review UI is open.
+      }
+    }
+
+    function showPanel(panelId) {
+      const panels = ["panelIdle", "panelRecording", "panelProcessing", "panelError", "panelPendingOverview"];
+      panels.forEach(id => {
+        const p = document.getElementById(id);
+        if (p) {
+          p.classList.toggle("active", id === panelId);
+        }
+      });
+    }
+
+    async function startRecording() {
+      try {
+        const response = await fetch("/api/transcript/record/start", { method: "POST" });
+        if (response.ok) {
+          const data = await response.json();
+          updateDashboardState(data);
+        }
+      } catch (err) {
+        console.error("Error starting recording:", err);
+      }
+    }
+
+    async function stopRecording() {
+      try {
+        const response = await fetch("/api/transcript/record/stop", { method: "POST" });
+        if (response.ok) {
+          const data = await response.json();
+          updateDashboardState(data);
+        }
+      } catch (err) {
+        console.error("Error stopping recording:", err);
+      }
+    }
+
+    // ── Live meeting feed ────────────────────────────────────────────────────
+    // One WebSocket per screen. The server sends a full snapshot on connect,
+    // then incremental events, so every screen in the room stays identical.
+    const live = {
+      ws: null,
+      retryMs: 1000,
+      meeting: null,
+      segments: [],
+      paused: false,
+      clockOffset: 0,   // server_time - Date.now()/1000, so every screen shows the same clock
+      clockTimer: null,
+      stickToBottom: true,
+    };
+
+    function connectLive() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/ws/live`);
+      live.ws = ws;
+
+      ws.onopen = () => { live.retryMs = 1000; };
+      ws.onmessage = (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        handleLiveMessage(msg);
+      };
+      ws.onclose = () => {
+        live.ws = null;
+        setTimeout(connectLive, live.retryMs);
+        live.retryMs = Math.min(live.retryMs * 2, 10000);
+      };
+      ws.onerror = () => ws.close();
+    }
+
+    // Keep proxies/NAT from dropping an idle socket on long quiet stretches.
+    setInterval(() => {
+      if (live.ws && live.ws.readyState === WebSocket.OPEN) live.ws.send("ping");
+    }, 25000);
+
+    function handleLiveMessage(msg) {
+      if (msg.server_time) live.clockOffset = msg.server_time - Date.now() / 1000;
+
+      switch (msg.type) {
+        case "snapshot":
+          live.meeting = msg.meeting;
+          live.segments = msg.segments || [];
+          live.paused = !!msg.paused;
+          renderLiveAll();
+          setLivePartial(msg.partial || "");
+          renderSttState(msg.stt || {});
+          break;
+        case "meeting.started":
+          live.meeting = msg.meeting;
+          live.segments = [];
+          live.paused = false;
+          live.stickToBottom = true;
+          renderLiveAll();
+          checkPendingStatus();
+          break;
+        case "segment":
+          live.segments.push(msg.segment);
+          appendLiveSegment(msg.segment);
+          setLivePartial("");
+          renderLiveStats();
+          break;
+        case "partial":
+          setLivePartial(msg.text || "");
+          break;
+        case "paused":
+          live.paused = !!msg.paused;
+          renderLivePaused();
+          if (live.paused) setLivePartial("");
+          break;
+        case "stt":
+          renderSttState(msg);
+          break;
+        case "meeting.ended":
+          live.meeting = null;
+          stopLiveClock();
+          renderSttState({ stt: "idle" });
+          checkPendingStatus();
+          break;
+      }
+    }
+
+    function formatOffset(seconds) {
+      const s = Math.max(0, Math.floor(seconds || 0));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      const mm = String(m).padStart(2, "0");
+      const ss = String(sec).padStart(2, "0");
+      return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+    }
+
+    function renderLiveAll() {
+      const container = document.getElementById("liveSegments");
+      container.textContent = "";
+      live.segments.forEach(seg => container.appendChild(buildSegmentEl(seg)));
+      renderLiveStats();
+      renderLivePaused();
+      startLiveClock();
+      scrollLiveToBottom(false);
+    }
+
+    function buildSegmentEl(seg) {
+      const row = document.createElement("div");
+      row.className = "live-segment";
+      const time = document.createElement("span");
+      time.className = "live-segment-time";
+      time.textContent = formatOffset(seg.offset_s);
+      const text = document.createElement("span");
+      text.className = "live-segment-text";
+      text.textContent = seg.text;
+      if (seg.language) text.lang = seg.language;
+      row.append(time, text);
+      return row;
+    }
+
+    function appendLiveSegment(seg) {
+      document.getElementById("liveSegments").appendChild(buildSegmentEl(seg));
+      document.getElementById("liveFeedEmpty").hidden = true;
+      scrollLiveToBottom(false);
+    }
+
+    function setLivePartial(text) {
+      const el = document.getElementById("livePartial");
+      const show = !!text && !live.paused;
+      el.hidden = !show;
+      if (show) {
+        el.querySelector(".live-segment-text").textContent = text;
+        document.getElementById("liveFeedEmpty").hidden = true;
+        scrollLiveToBottom(false);
+      }
+    }
+
+    function renderLiveStats() {
+      const m = live.meeting;
+      const words = live.segments.reduce((n, s) => n + s.text.split(/\s+/).filter(Boolean).length, 0);
+      const langs = [...new Set(live.segments.map(s => s.language).filter(Boolean))];
+      document.getElementById("liveStatStarted").textContent =
+        m ? new Date(m.started_at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+      document.getElementById("liveStatLines").textContent = live.segments.length;
+      document.getElementById("liveStatWords").textContent = words.toLocaleString();
+      document.getElementById("liveStatLangs").textContent = langs.length ? langs.join(", ") : "—";
+      document.getElementById("liveStatSource").textContent = m ? m.source : "—";
+      document.getElementById("liveFeedEmpty").hidden = live.segments.length > 0;
+    }
+
+    function renderLivePaused() {
+      const badge = document.getElementById("liveBadge");
+      badge.classList.toggle("is-paused", live.paused);
+      document.getElementById("liveBadgeText").textContent = live.paused ? "Paused" : "Live";
+      document.getElementById("livePausedBanner").hidden = !live.paused;
+      document.getElementById("btnLivePauseText").textContent = live.paused ? "Resume" : "Pause";
+    }
+
+    function renderSttState(state) {
+      const el = document.getElementById("liveSttState");
+      const backend = state.backend === "chunked" ? " (backup mode)" : "";
+      const labels = {
+        idle: ["Transcription: waiting for audio", ""],
+        connecting: ["Transcription: connecting…", "is-warn"],
+        live: [`Transcription: live${backend}`, "is-ok"],
+        reconnecting: ["Transcription: reconnecting…", "is-warn"],
+        fallback: ["Transcription: switching to backup mode…", "is-warn"],
+        error: ["Transcription: error — check System Logs", "is-error"],
+      };
+      const [text, cls] = labels[state.stt] || labels.idle;
+      el.textContent = text;
+      el.className = `live-stt ${cls}`;
+      el.title = state.detail || "Speech-to-text connection";
+    }
+
+    function startLiveClock() {
+      stopLiveClock();
+      const tick = () => {
+        const el = document.getElementById("liveClock");
+        if (!live.meeting) { el.textContent = "00:00"; return; }
+        el.textContent = formatOffset(Date.now() / 1000 + live.clockOffset - live.meeting.started_at);
+      };
+      tick();
+      live.clockTimer = setInterval(tick, 1000);
+    }
+
+    function stopLiveClock() {
+      if (live.clockTimer) clearInterval(live.clockTimer);
+      live.clockTimer = null;
+    }
+
+    function scrollLiveToBottom(force) {
+      const feed = document.getElementById("liveFeed");
+      if (force) live.stickToBottom = true;
+      if (live.stickToBottom) feed.scrollTop = feed.scrollHeight;
+      document.getElementById("liveJumpBtn").hidden = live.stickToBottom;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const feed = document.getElementById("liveFeed");
+      // Reading back through the transcript pauses auto-scroll until "Jump to live".
+      feed.addEventListener("scroll", () => {
+        const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
+        live.stickToBottom = atBottom;
+        document.getElementById("liveJumpBtn").hidden = atBottom;
+      });
+      connectLive();
+    });
+
+    async function toggleLivePause() {
+      const btn = document.getElementById("btnLivePause");
+      btn.disabled = true;
+      try {
+        await fetch(live.paused ? "/api/live/resume" : "/api/live/pause", { method: "POST" });
+      } catch (err) {
+        console.error("Pause/resume failed:", err);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function loadPendingForm(data) {
+      teamsPublished = false;
+      azureSynced = false;
+      updateSyncStatusBadges();
+      const summary = data.summary || {};
+      
+      // Populate overview cards
+      document.getElementById("overviewTitle").value = summary.title || "";
+      document.getElementById("overviewText").value = summary.summary || "";
+      document.getElementById("overviewAttendees").value = (summary.attendees || []).join(", ");
+      document.getElementById("overviewDecisions").value = (summary.decisions || []).join("\n");
+      document.getElementById("overviewNextMeeting").value = summary.next_meeting || "";
+      document.getElementById("transcriptText").textContent = data.transcript || "";
+      
+      // Populate Teams card inputs
+      document.getElementById("summaryTitle").value = summary.title || "";
+      document.getElementById("summaryText").value = summary.summary || "";
+      document.getElementById("summaryAttendees").value = (summary.attendees || []).join(", ");
+      document.getElementById("summaryDecisions").value = (summary.decisions || []).join("\n");
+      document.getElementById("summaryNextMeeting").value = summary.next_meeting || "";
+
+      document.getElementById("teamsToggle").checked = true;
+      toggleTeamsSection();
+
+      // Load DevOps Work Items
+      localWorkItems = (data.work_items || []).map((item, index) => normalizeWorkItem(item, index));
+
+      renderWorkItems();
+    }
+
+    // Two-way synchronization: Overview tab -> Teams form tab
+    function syncOverviewToForms() {
+      document.getElementById("summaryTitle").value = document.getElementById("overviewTitle").value;
+      document.getElementById("summaryText").value = document.getElementById("overviewText").value;
+      document.getElementById("summaryAttendees").value = document.getElementById("overviewAttendees").value;
+      document.getElementById("summaryDecisions").value = document.getElementById("overviewDecisions").value;
+      document.getElementById("summaryNextMeeting").value = document.getElementById("overviewNextMeeting").value;
+    }
+
+    // Two-way synchronization: Teams form tab -> Overview tab
+    function syncFormsToOverview() {
+      document.getElementById("overviewTitle").value = document.getElementById("summaryTitle").value;
+      document.getElementById("overviewText").value = document.getElementById("summaryText").value;
+      document.getElementById("overviewAttendees").value = document.getElementById("summaryAttendees").value;
+      document.getElementById("overviewDecisions").value = document.getElementById("summaryDecisions").value;
+      document.getElementById("overviewNextMeeting").value = document.getElementById("summaryNextMeeting").value;
+    }
+
+    function toggleTeamsSection() {
+      const active = document.getElementById("teamsToggle").checked;
+      const formBody = document.getElementById("teamsFormBody");
+      if (formBody) {
+        formBody.style.opacity = active ? "1" : "0.35";
+        formBody.style.pointerEvents = active ? "all" : "none";
+      }
+
+      const btn = document.getElementById("btnApproveAction");
+      if (currentTab === "teams" && btn && !teamsPublished) {
+        btn.disabled = !active;
+        btn.style.opacity = active ? "1" : "0.5";
+      }
+    }
+
+    function renderWorkItems() {
+      const listContainer = document.getElementById("workItemsList");
+      listContainer.innerHTML = "";
+      
+      const activeItems = localWorkItems.filter(item => item.included);
+      const activeCount = activeItems.length;
+      
+      // Update counts
+      document.getElementById("itemsCounter").innerText = `${activeCount} approved / ${localWorkItems.length} total`;
+      
+      const badge = document.getElementById("badgeAzureCount");
+      if (activeCount > 0) {
+        badge.innerText = activeCount;
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      if (localWorkItems.length === 0) {
+        listContainer.innerHTML = `
+          <div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 2rem; border: 1px dashed var(--border-color-strong); border-radius: 0;">
+            No work items generated. Click "New Item" to add one manually.
+          </div>`;
+        return;
+      }
+
+      localWorkItems.forEach(item => {
+        const card = document.createElement("div");
+        card.className = `work-item-edit-card ${item.included ? "" : "excluded"}`;
+        card.id = `item-card-${item.id}-type-${item.type.toLowerCase()}`;
+
+        const priorityOptions = [
+          `<option value="" ${item.priority === "" || item.priority == null ? "selected" : ""} disabled>Select priority…</option>`,
+          `<option value="1" ${item.priority === 1 ? "selected" : ""}>1 - High</option>`,
+          `<option value="2" ${item.priority === 2 ? "selected" : ""}>2 - Medium</option>`,
+          `<option value="3" ${item.priority === 3 ? "selected" : ""}>3 - Low</option>`,
+          `<option value="4" ${item.priority === 4 ? "selected" : ""}>4 - Backlog</option>`
+        ].join("");
+
+        card.innerHTML = `
+          <div class="card-header-row">
+            <div style="display: flex; gap: 0.6rem; align-items: center;">
+              <span class="type-indicator type-${item.type.toLowerCase()}"></span>
+              <select class="input-field" style="width: auto; padding: 0.35rem 0.65rem; font-size: 0.75rem; font-weight: 600; height: auto;" onchange="updateWorkItemField(${item.id}, 'type', this.value); renderWorkItems();">
+                <option value="Task" ${item.type === "Task" ? "selected" : ""}>Task</option>
+                <option value="Bug" ${item.type === "Bug" ? "selected" : ""}>Bug</option>
+              </select>
+              <button class="button button-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-color: rgba(var(--rose-rgb), 0.2); background: rgba(var(--rose-rgb), 0.03); color: var(--accent-rose);" onclick="deleteWorkItem(${item.id})">
+                Remove
+              </button>
+            </div>
+            
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <span style="font-size: 0.75rem; color: var(--text-gray); font-weight: 600;">${item.included ? "Sync Active" : "Sync Muted"}</span>
+              <label class="toggle-switch">
+                <input type="checkbox" ${item.included ? "checked" : ""} onchange="toggleWorkItem(${item.id})">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-element">
+            <label>Title *</label>
+            <input type="text" class="input-field" style="font-weight: 600;" value="${escapeHtml(item.title)}" 
+              oninput="updateWorkItemField(${item.id}, 'title', this.value)" placeholder="Work Item Title">
+          </div>
+
+          <div class="form-element">
+            <label>Description *</label>
+            <textarea class="input-field" style="min-height: 60px;" oninput="updateWorkItemField(${item.id}, 'description', this.value)" 
+              placeholder="Detailed description...">${escapeHtml(item.description)}</textarea>
+          </div>
+
+          <div class="card-meta-row">
+            <div class="form-element">
+              <label>Priority *</label>
+              <select class="input-field" style="padding: 0.5rem;" required
+                onchange="updateWorkItemField(${item.id}, 'priority', this.value ? parseInt(this.value) : '')">
+                ${priorityOptions}
+              </select>
+            </div>
+
+            <div class="form-element">
+              <label>Due Date</label>
+              <input type="date" class="input-field" style="padding: 0.5rem;" required
+                value="${escapeHtml(item.due_date)}"
+                onchange="updateWorkItemField(${item.id}, 'due_date', this.value)"
+                oninput="updateWorkItemField(${item.id}, 'due_date', this.value)">
+            </div>
+            
+            <div class="form-element">
+              <label>Assignee</label>
+              <input type="text" class="input-field" style="padding: 0.5rem;" value="${escapeHtml(item.assigned_to)}" 
+                oninput="updateWorkItemField(${item.id}, 'assigned_to', this.value)" placeholder="Email address">
+            </div>
+          </div>
+
+          <div class="card-meta-row card-meta-row--even2">
+            <div class="form-element">
+              <label>Tags (Comma-sep)</label>
+              <input type="text" class="input-field" style="padding: 0.5rem;" value="${escapeHtml((item.tags || []).join(', '))}" 
+                oninput="updateWorkItemField(${item.id}, 'tags', this.value.split(',').map(s=>s.trim()).filter(Boolean))" placeholder="tag1, tag2">
+            </div>
+          </div>
+
+          <div class="card-meta-row card-meta-row--even2">
+            <div class="form-element">
+              <label>Area Path</label>
+              <input type="text" class="input-field" style="padding: 0.5rem;" value="${escapeHtml(item.area_path)}" 
+                oninput="updateWorkItemField(${item.id}, 'area_path', this.value)" placeholder="e.g. MyProject">
+            </div>
+            <div class="form-element">
+              <label>Iteration Path</label>
+              <input type="text" class="input-field" style="padding: 0.5rem;" value="${escapeHtml(item.iteration_path)}" 
+                oninput="updateWorkItemField(${item.id}, 'iteration_path', this.value)" placeholder="e.g. MyProject\\Sprint 1">
+            </div>
+          </div>
+        `;
+        listContainer.appendChild(card);
+      });
+    }
+
+    function toggleWorkItem(id) {
+      const idx = localWorkItems.findIndex(x => x.id === id);
+      if (idx !== -1) {
+        localWorkItems[idx].included = !localWorkItems[idx].included;
+        renderWorkItems();
+      }
+    }
+
+    function updateWorkItemField(id, field, value) {
+      const idx = localWorkItems.findIndex(x => x.id === id);
+      if (idx !== -1) {
+        localWorkItems[idx][field] = value;
+      }
+    }
+
+    function addWorkItem() {
+      const newId = localWorkItems.length > 0 ? Math.max(...localWorkItems.map(item => item.id)) + 1 : 0;
+      localWorkItems.push(normalizeWorkItem({ id: newId }, newId));
+      renderWorkItems();
+    }
+
+    function deleteWorkItem(id) {
+      localWorkItems = localWorkItems.filter(item => item.id !== id);
+      renderWorkItems();
+    }
+
+    async function dismissPending() {
+      if (!confirm("Are you sure you want to dismiss this transcript? This will clear the dashboard state.")) {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/transcript/pending?end_live=true", { method: "DELETE" });
+        if (response.ok) {
+          // Remove from local storage history
+          if (currentSessionData) {
+            let history = JSON.parse(localStorage.getItem("pmbot_history") || "[]");
+            history = history.filter(item => item.id !== currentSessionData.source_file);
+            localStorage.setItem("pmbot_history", JSON.stringify(history));
+            renderRecentSessions();
+          }
+
+          currentSessionData = null;
+          localWorkItems = [];
+          viewingHistory = false;
+          updateDashboardState({ status: "idle" });
+          startPolling();
+        }
+      } catch (err) {
+        console.error("Error clearing state:", err);
+      }
+    }
+
+    async function archiveSession() {
+      let warnMsg = "Close and archive this session? This will save the final states to history and reset the dashboard.";
+      if (!teamsPublished && !azureSynced) {
+        warnMsg = "Warning: You haven't published to Microsoft Teams or synced to Azure DevOps yet. Close and archive this session anyway?";
+      } else if (!teamsPublished) {
+        warnMsg = "Warning: You haven't published to Microsoft Teams. Close and archive this session anyway?";
+      } else if (!azureSynced) {
+        warnMsg = "Warning: You haven't synced to Azure DevOps. Close and archive this session anyway?";
+      }
+
+      if (!confirm(warnMsg)) {
+        return;
+      }
+      
+      const btn = document.getElementById("btnApproveAction");
+      const approveText = document.getElementById("approveActionText");
+      const spinner = document.getElementById("confirmSpinner");
+
+      let originalText = "";
+      if (approveText) {
+        originalText = approveText.innerText;
+        approveText.innerText = "Archiving Session...";
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        btn.style.cursor = "not-allowed";
+      }
+
+      if (spinner) spinner.style.display = "inline-block";
+      
+      try {
+        const response = await fetch("/api/transcript/pending", { method: "DELETE" });
+        if (response.ok) {
+          if (currentSessionData) {
+            const summary = {
+              title: document.getElementById("overviewTitle").value.trim(),
+              summary: document.getElementById("overviewText").value.trim(),
+              attendees: document.getElementById("overviewAttendees").value.split(",").map(x=>x.trim()).filter(Boolean),
+              decisions: document.getElementById("overviewDecisions").value.split("\n").map(x=>x.trim()).filter(Boolean),
+              next_meeting: document.getElementById("overviewNextMeeting").value.trim() || null
+            };
+            currentSessionData.summary = summary;
+            currentSessionData.work_items = localWorkItems;
+            currentSessionData.status = "approved";
+            saveSessionToHistory(currentSessionData);
+          }
+          currentSessionData = null;
+          localWorkItems = [];
+          teamsPublished = false;
+          azureSynced = false;
+          updateDashboardState({ status: "idle" });
+          startPolling();
+          setTab("overview");
+        }
+      } catch (err) {
+        alert("Failed to archive session: " + err.message);
+      } finally {
+        if (spinner) spinner.style.display = "none";
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = "";
+          btn.style.cursor = "";
+        }
+        if (approveText) {
+          approveText.innerText = originalText;
+        }
+      }
+    }
+
+    async function confirmApproval(type) {
+      if (!type) type = currentTab;
+      lastSyncType = type;
+
+      if (type === "overview") {
+        await archiveSession();
+        return;
+      }
+
+      const btn = document.getElementById("btnApproveAction");
+      const approveText = document.getElementById("approveActionText");
+      const spinner = document.getElementById("confirmSpinner");
+
+      let originalText = "";
+      if (approveText) {
+        originalText = approveText.innerText;
+        if (type === "teams") {
+          approveText.innerText = "Publishing to Teams...";
+        } else if (type === "azure") {
+          approveText.innerText = "Syncing to Azure DevOps...";
+        } else {
+          approveText.innerText = "Syncing Details...";
+        }
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        btn.style.cursor = "not-allowed";
+      }
+
+      if (spinner) spinner.style.display = "inline-block";
+
+      let payload = {
+        summary: null,
+        work_items: []
+      };
+
+      if (type === "teams") {
+        const titleVal = document.getElementById("summaryTitle").value.trim();
+        if (!titleVal) {
+          alert("Summary Title is required when posting to Microsoft Teams.");
+          if (spinner) spinner.style.display = "none";
+          if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = "";
+            btn.style.cursor = "";
+          }
+          if (approveText) approveText.innerText = originalText;
+          return;
+        }
+
+        const attendeesVal = document.getElementById("summaryAttendees").value;
+        const decisionsVal = document.getElementById("summaryDecisions").value;
+
+        payload.summary = {
+          title: titleVal,
+          summary: document.getElementById("summaryText").value.trim(),
+          attendees: attendeesVal ? attendeesVal.split(",").map(x => x.trim()).filter(Boolean) : [],
+          decisions: decisionsVal ? decisionsVal.split("\n").map(x => x.trim()).filter(Boolean) : [],
+          next_meeting: document.getElementById("summaryNextMeeting").value.trim() || null
+        };
+      } else if (type === "azure") {
+        // Gather approved work items
+        payload.work_items = localWorkItems
+          .filter(item => item.included)
+          .map(item => ({
+            type: item.type,
+            title: item.title.trim(),
+            description: item.description.trim(),
+            priority: item.priority,
+            assigned_to: (item.assigned_to || "").trim() || null,
+            tags: (item.tags || []).filter(Boolean),
+            area_path: (item.area_path || "").trim() || null,
+            iteration_path: (item.iteration_path || "").trim() || null,
+            due_date: (item.due_date || "").trim() || null
+          }));
+
+        const resetApproveBtn = () => {
+          if (spinner) spinner.style.display = "none";
+          if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = "";
+            btn.style.cursor = "";
+          }
+          if (approveText) approveText.innerText = originalText;
+        };
+
+        if (payload.work_items.length === 0) {
+          alert("Please check at least one sync active work item to sync to Azure DevOps.");
+          resetApproveBtn();
+          return;
+        }
+
+        const missing = payload.work_items.find(x =>
+          !x.title || !x.description || !x.priority
+        );
+        if (missing) {
+          alert("Each work item needs a Title, Description, and Priority.");
+          resetApproveBtn();
+          return;
+        }
+      }
+
+      try {
+        const response = await fetch("/api/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const outcomeData = await response.json();
+        
+        if (spinner) spinner.style.display = "none";
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = "";
+          btn.style.cursor = "";
+        }
+        if (approveText) {
+          approveText.innerText = originalText;
+        }
+        
+        displayOutcome(outcomeData, type === "teams");
+      } catch (err) {
+        if (spinner) spinner.style.display = "none";
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = "";
+          btn.style.cursor = "";
+        }
+        if (approveText) {
+          approveText.innerText = originalText;
+        }
+        alert("Server error during sync: " + err.message);
+      }
+    }
+
+    function displayOutcome(data, teamsActive) {
+      const outcomeBody = document.getElementById("outcomeBody");
+      outcomeBody.innerHTML = "";
+
+      // Teams Outcome
+      if (teamsActive) {
+        const tStatus = data.teams || {};
+        const success = tStatus.ok;
+        const div = document.createElement("div");
+        div.className = "sync-outcome-item";
+        div.innerHTML = `
+          <div class="outcome-status-icon">${success ? "✅" : "❌"}</div>
+          <div class="outcome-details">
+            <div class="outcome-title">Microsoft Teams Channel Notification</div>
+            <div class="outcome-desc">${success ? "Posted executive summary card to channel successfully." : "Error: " + (tStatus.error || "Webhook failed")}</div>
+          </div>
+        `;
+        outcomeBody.appendChild(div);
+      }
+
+      // Azure DevOps Outcomes
+      const adoItems = data.ado || [];
+      if (!teamsActive) {
+        if (adoItems.length === 0) {
+          const div = document.createElement("div");
+          div.className = "sync-outcome-item";
+          div.innerHTML = `
+            <div class="outcome-status-icon">➖</div>
+            <div class="outcome-details">
+              <div class="outcome-title">Azure DevOps Sync</div>
+              <div class="outcome-desc">No work items were synchronised.</div>
+            </div>
+          `;
+          outcomeBody.appendChild(div);
+        } else {
+          adoItems.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "sync-outcome-item";
+            const success = item.ok;
+            
+            div.innerHTML = `
+              <div class="outcome-status-icon">${success ? "✅" : "❌"}</div>
+              <div class="outcome-details">
+                <div class="outcome-title">${escapeHtml(item.title)}</div>
+                <div class="outcome-desc">${success ? `Created successfully as work item #${item.id}` : "Error: " + (item.error || "Failed to create work item")}</div>
+                ${success && item.url ? `<a href="${item.url}" target="_blank" class="outcome-link">🔗 View in Azure DevOps</a>` : ""}
+              </div>
+            `;
+            outcomeBody.appendChild(div);
+          });
+        }
+      }
+
+      document.getElementById("outcomeModal").classList.add("active");
+    }
+
+    async function closeOutcomeModal() {
+      document.getElementById("outcomeModal").classList.remove("active");
+      
+      const btn = document.getElementById("btnApproveAction");
+      const approveText = document.getElementById("approveActionText");
+
+      if (lastSyncType === "teams") {
+        teamsPublished = true;
+        if (approveText) approveText.innerText = "Teams Published ✓";
+        if (btn) {
+          btn.disabled = true;
+          btn.style.background = 'rgba(var(--emerald-rgb), 0.2)';
+          btn.style.borderColor = 'var(--accent-emerald)';
+          btn.style.color = 'var(--accent-emerald)';
+        }
+      } else if (lastSyncType === "azure") {
+        azureSynced = true;
+        // Mute all checked work items since they have been synced
+        localWorkItems.forEach(item => {
+          if (item.included) {
+            item.included = false;
+          }
+        });
+        renderWorkItems();
+
+        if (approveText) approveText.innerText = "Azure Synced ✓";
+        if (btn) {
+          btn.disabled = true;
+          btn.style.background = 'rgba(var(--emerald-rgb), 0.2)';
+          btn.style.borderColor = 'var(--accent-emerald)';
+          btn.style.color = 'var(--accent-emerald)';
+        }
+      }
+      updateSyncStatusBadges();
+    }
+
+    // Standard modal conventions the outcome dialog was missing: Escape, and clicking the
+    // dimmed backdrop (not the dialog itself), both close it the same way "Done" does.
+    const outcomeModalEl = document.getElementById("outcomeModal");
+    outcomeModalEl.addEventListener("click", (e) => {
+      if (e.target === outcomeModalEl) closeOutcomeModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && outcomeModalEl.classList.contains("active")) {
+        closeOutcomeModal();
+      }
+    });
+
+    // Helper to dynamically update the integration status badges on the Overview page
+    function updateSyncStatusBadges() {
+      const teamsIcon = document.getElementById("statusBadgeTeamsIcon");
+      const teamsText = document.getElementById("statusBadgeTeamsText");
+      const azureIcon = document.getElementById("statusBadgeAzureIcon");
+      const azureText = document.getElementById("statusBadgeAzureText");
+
+      if (teamsIcon && teamsText) {
+        if (teamsPublished) {
+          teamsIcon.innerText = "✅";
+          teamsText.innerText = "Teams: Published";
+          teamsText.style.color = "var(--accent-emerald)";
+        } else {
+          teamsIcon.innerText = "⚪";
+          teamsText.innerText = "Teams: Pending";
+          teamsText.style.color = "var(--text-gray)";
+        }
+      }
+
+      if (azureIcon && azureText) {
+        if (azureSynced) {
+          azureIcon.innerText = "✅";
+          azureText.innerText = "Azure DevOps: Synced";
+          azureText.style.color = "var(--accent-emerald)";
+        } else {
+          azureIcon.innerText = "⚪";
+          azureText.innerText = "Azure DevOps: Pending";
+          azureText.style.color = "var(--text-gray)";
+        }
+      }
+    }
+
+    // Persistent LocalStorage History Helper
+    function saveSessionToHistory(sessionData) {
+      if (!sessionData || !sessionData.summary) return;
+      let history = JSON.parse(localStorage.getItem("pmbot_history") || "[]");
+      
+      const id = sessionData.source_file || sessionData.summary.title || Date.now().toString();
+      const existingIdx = history.findIndex(item => item.id === id);
+      
+      const record = {
+        id: id,
+        title: sessionData.summary.title || "Untitled Meeting",
+        date: new Date().toLocaleDateString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}),
+        duration: sessionData.duration_seconds || 0,
+        transcript: sessionData.transcript,
+        summary: sessionData.summary,
+        work_items: localWorkItems.length > 0 ? localWorkItems : (sessionData.work_items || []),
+        status: sessionData.status || "pending_approval"
+      };
+
+      if (existingIdx !== -1) {
+        history[existingIdx] = record;
+      } else {
+        history.unshift(record);
+      }
+      
+      history = history.slice(0, 5);
+      localStorage.setItem("pmbot_history", JSON.stringify(history));
+      renderRecentSessions();
+    }
+
+    function renderRecentSessions() {
+      const container = document.getElementById("recentSessionsList");
+      if (!container) return;
+      
+      const history = JSON.parse(localStorage.getItem("pmbot_history") || "[]");
+      if (history.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1rem;">No recent sessions</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      history.forEach(session => {
+        const item = document.createElement("div");
+        item.className = "recent-session-item";
+        const statusTag = session.status === "approved" ? "approved" : "review";
+        const statusText = session.status === "approved" ? "Synced" : "Review";
+        
+        item.innerHTML = `
+          <div class="session-meta">
+            <span class="session-title">${escapeHtml(session.title)}</span>
+            <span class="session-date">${session.date} (${formatDuration(session.duration)})</span>
+          </div>
+          <span class="session-status-badge badge-${statusTag}">${statusText}</span>
+        `;
+        item.addEventListener("click", () => loadSessionFromHistory(session));
+        container.appendChild(item);
+      });
+    }
+
+    function formatDuration(seconds) {
+      if (!seconds) return "0s";
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
+
+    function loadSessionFromHistory(session) {
+      viewingHistory = true;
+      currentSessionData = session;
+      localWorkItems = (session.work_items || []).map((item, index) => normalizeWorkItem(item, index));
+      
+      loadPendingForm({
+        transcript: session.transcript,
+        summary: session.summary,
+        work_items: session.work_items || [],
+        source_file: session.id,
+        duration_seconds: session.duration
+      });
+      
+      const histBar = document.getElementById("viewingHistoryIndicator");
+      if (histBar) histBar.style.display = "flex";
+      
+      updateDashboardState({
+        status: "pending_approval",
+        transcript: session.transcript,
+        summary: session.summary,
+        work_items: session.work_items,
+        source_file: session.id,
+        duration_seconds: session.duration
+      });
+
+      setTab("overview");
+    }
+
+    function dismissHistoryView() {
+      viewingHistory = false;
+      const histBar = document.getElementById("viewingHistoryIndicator");
+      if (histBar) histBar.style.display = "none";
+      currentSessionData = null;
+      localWorkItems = [];
+      updateDashboardState({ status: "idle" });
+      startPolling();
+    }
+
+    function copyTranscriptToClipboard() {
+      const el = document.getElementById("transcriptText");
+      const text = el ? el.textContent : "";
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Transcript copied to clipboard!");
+      }).catch(err => {
+        console.error("Failed to copy transcript: ", err);
+      });
+    }
+
+    // System Logs Console fetching logic
+    function selectLogTab(tab) {
+      currentLogTab = tab;
+      document.getElementById("btnTabWorker").classList.toggle("active", tab === "worker");
+      document.getElementById("btnTabServer").classList.toggle("active", tab === "server");
+      renderLogs();
+    }
+
+    async function fetchLogs() {
+      try {
+        const response = await fetch("/api/transcript/logs?lines=100");
+        if (response.ok) {
+          cachedLogs = await response.json();
+          renderLogs();
+        }
+      } catch (err) {
+        console.error("Failed to fetch logs:", err);
+      }
+    }
+
+    function renderLogs() {
+      const viewer = document.getElementById("logsViewer");
+      const text = cachedLogs[currentLogTab] || `No ${currentLogTab} logs available.`;
+      viewer.textContent = text;
+      
+      const autoscroll = document.getElementById("chkAutoscroll").checked;
+      if (autoscroll) {
+        viewer.scrollTop = viewer.scrollHeight;
+      }
+    }
+
+    // Drag and drop file upload
+    function setupFileUpload() {
+      const dropZone = document.getElementById("uploadDropZone");
+      const fileInput = document.getElementById("uploadFileInput");
+
+      dropZone.addEventListener("click", () => fileInput.click());
+
+      // Keyboard equivalent of the click above — dropZone is a div-as-button (role="button"),
+      // which gets focus/tabindex for free but not native Enter/Space activation.
+      dropZone.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          handleFileUpload(files[0]);
+        }
+      });
+
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files.length > 0) {
+          handleFileUpload(fileInput.files[0]);
+        }
+      });
+    }
+
+    const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // 1GB — multipart upload streams the raw file (no base64)
+
+    async function handleFileUpload(file) {
+      if (!file.name.toLowerCase().endsWith(".wav")) {
+        alert("Please upload a .wav audio file (16kHz mono).");
+        return;
+      }
+      if (file.size > MAX_UPLOAD_BYTES) {
+        alert(
+          `This file is ${(file.size / 1024 / 1024).toFixed(0)}MB — too large for browser upload (limit ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).\n\n` +
+          "For longer recordings, copy the .wav into the container recordings volume and run transcribe_and_post.sh."
+        );
+        return;
+      }
+
+      const dropZone = document.getElementById("uploadDropZone");
+      const originalHTML = dropZone.innerHTML;
+
+      dropZone.innerHTML = `
+        <div class="spinner" style="width: 1.5rem; height: 1.5rem; border: 2.5px solid rgba(var(--ink-rgb),0.1); border-left-color: var(--accent-primary); border-radius:50%; animation: spin 1s linear infinite; margin-bottom: 0.25rem;"></div>
+        <p style="font-size: 0.75rem; font-weight: 600;">Uploading ${(file.size / 1024 / 1024).toFixed(0)}MB...</p>
+      `;
+
+      try {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        const response = await fetch("/api/transcript/upload", {
+          method: "POST",
+          body: form,
+        });
+
+        dropZone.innerHTML = originalHTML;
+
+        if (response.ok) {
+          document.getElementById("uploadFileInput").value = "";
+          const data = await response.json();
+          updateDashboardState(data);
+          startPolling();
+        } else {
+          const err = await response.json().catch(() => ({}));
+          const detail = Array.isArray(err.detail)
+            ? err.detail.map(d => d.msg || JSON.stringify(d)).join(", ")
+            : (err.detail || "Server error");
+          alert("Upload failed: " + detail);
+        }
+      } catch (e) {
+        alert("Error uploading file: " + e.message);
+        dropZone.innerHTML = originalHTML;
+      }
+    }
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById("leftSidebar");
+      const backdrop = document.getElementById("mobileSidebarBackdrop");
+      sidebar.classList.toggle("active-mobile");
+      backdrop.classList.toggle("active");
+    }
+
+    // Escape closes the mobile nav drawer, same as clicking its backdrop
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.getElementById("leftSidebar").classList.contains("active-mobile")) {
+        toggleMobileSidebar();
+      }
+    });
+
+    // Helper functions
+    function escapeHtml(text) {
+      if (!text) return "";
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+# ── Web framework ─────────────────────────────────────────────────────────────
+# Decision: FastAPI over Flask
+#   FastAPI is async-native (ASGI). While waiting for the Anthropic API
+#   response (network round trip, typically 3–8s on Pi), an async server
+#   yields the event loop — it can serve the dashboard polling request
+#   during that wait. Flask is sync (WSGI) and would block the entire
+#   process during that wait. On a Pi with limited CPU this matters.
+fastapi==0.111.0
+
+# Decision: uvicorn[standard] over plain uvicorn
+#   The [standard] extra pulls in uvloop and httptools.
+#   uvloop is a Cython-based replacement for Python's default asyncio
+#   event loop — benchmarks show 2–4x faster I/O on ARM.
+#   httptools is a faster HTTP parser (written in C).
+#   Both are precompiled wheels for arm64, zero extra compile time.
+#   Real-world impact on Pi: request handling overhead drops noticeably.
+uvicorn[standard]==0.30.1
+
+# ── HTTP client ───────────────────────────────────────────────────────────────
+# Decision: httpx over requests
+#   requests is synchronous — calling it inside an async FastAPI route
+#   blocks the event loop for the entire duration of the HTTP call.
+#   httpx has an identical API to requests but supports async/await.
+#   On Pi, the Anthropic API call takes 3–8s. With httpx + async, uvicorn
+#   handles other requests during that wait. With requests, it cannot.
+httpx==0.27.0
+
+# Decision: websockets pinned explicitly (uvicorn[standard] also pulls it in)
+#   The server connects to Sarvam realtime STT with the asyncio client and
+#   the recording worker streams mic audio with the sync client
+#   (websockets.sync, available since 11). Pinned so `extra_headers` keeps
+#   working — 14+ renamed it.
+websockets==12.0
+
+# ── Config / validation ───────────────────────────────────────────────────────
+python-dotenv==1.0.1
+
+# Pydantic v2 ships with FastAPI — listed explicitly for clarity.
+# Decision: use Pydantic models for all request/response bodies
+#   Catches malformed LLM tool outputs early with clear error messages
+#   rather than cryptic KeyErrors deep in the code.
+pydantic==2.7.1
+
+# ── Audio (recording) ─────────────────────────────────────────────────────────
+# These are used by record_worker.py (the worker process), not the server.
+# Decision: keep them in the same venv as the server
+#   One venv, one PATH, one pip install. Simpler Dockerfile, easier to
+#   debug on the Pi. Memory overhead of unused imports is negligible.
+pyaudio==0.2.14
+webrtcvad==2.0.10
+numpy<2.0.0
+mcp
+
+# Decision: openWakeWord ("hey_jarvis") over Porcupine/Snowboy
+#   Apache-2.0, no API key/account needed unlike Porcupine. Runs on ONNX
+#   Runtime — same CPU-only story as everything else on the Pi. Model is
+#   ~1-3MB, negligible next to IndicWhisper's ~1.5GB checkpoint.
+openwakeword==0.6.0
+onnxruntime==1.18.1
+
+# ── Transcription (Sarvam API) ───────────────────────────────────────────────
+# Decision: Sarvam Speech-to-Text API over local Whisper checkpoints
+#   Removes the large local model download / cache path and handles Hindi,
+#   English, and code-mixed audio through a managed API.
+# scripts/transcribe_indic.py uploads the WAV to Sarvam and writes the
+# returned transcript to <wav>.txt for transcribe_and_post.sh.
+
+

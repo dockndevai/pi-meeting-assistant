@@ -1,0 +1,79 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "send_channel_message",
+      "description": "Post the meeting summary to a Microsoft Teams channel via webhook. Call this once per meeting with the full formatted summary.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Short meeting title, e.g. 'Sprint planning – 10 Jun 2025'"
+          },
+          "summary": {
+            "type": "string",
+            "description": "3-5 sentence plain-English summary of what was discussed and decided"
+          },
+          "attendees": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names or roles mentioned in the transcript as present"
+          },
+          "decisions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Explicit decisions made during the meeting, one per entry"
+          },
+          "next_meeting": {
+            "type": "string",
+            "description": "Next meeting date/time if mentioned, otherwise omit"
+          }
+        },
+        "required": ["title", "summary", "decisions"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "wit_create_work_item",
+      "description": "Create a single work item in Azure DevOps. Call once per action item — do not batch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Work item type: Task, Bug, User Story, or Feature"
+          },
+          "title": {
+            "type": "string",
+            "description": "Concise title under 80 chars, starting with a verb"
+          },
+          "description": {
+            "type": "string",
+            "description": "Full context from the meeting"
+          },
+          "assigned_to": {
+            "type": "string",
+            "description": "Name or email of assignee as mentioned in transcript. Omit if not specified."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "1=Critical, 2=High, 3=Medium, 4=Low. Infer from urgency language."
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Relevant topic tags"
+          },
+          "area_path": {
+            "type": "string",
+            "description": "ADO area path if identifiable. Omit if unclear."
+          }
+        },
+        "required": ["type", "title", "description", "priority"]
+      }
+    }
+  }
+]

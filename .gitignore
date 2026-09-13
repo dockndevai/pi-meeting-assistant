@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Build artifacts
+pi-meeting.tar.gz
+*.tar.gz
+
+# Debug / tool output
+.playwright-mcp/
+
+# Runtime data (created by the app, not source)
+/recordings/
+
+# Audio — may contain real meeting recordings; never commit
+*.wav
+/scratch/
+
+# Local MCP auth tokens
+.msgraph-mcp-auth.json
+.teams-mcp-token-cache.json

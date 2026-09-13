@@ -1,0 +1,19 @@
+# ALSA default capture → USB mic (card 2 — check yours with `arecord -l`).
+# Playback is null — this container only needs input for wake-word/record.
+pcm.!default {
+  type asym
+  playback.pcm "null"
+  capture.pcm "mic"
+}
+pcm.mic {
+  type plug
+  slave {
+    pcm "hw:2,0"
+    rate 16000
+    channels 1
+  }
+}
+ctl.!default {
+  type hw
+  card 2
+}

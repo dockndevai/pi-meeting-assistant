@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "teams-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@floriscornel/teams-mcp@0.9.0"
+      ],
+      "env": {}
+    },
+    "Azure DevOps": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp@2.8.0",
+        "your-ado-org",
+        "--authentication",
+        "envvar"
+      ],
+      "env": {}
+    }
+  }
+}
