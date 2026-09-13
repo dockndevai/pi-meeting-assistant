@@ -1,4 +1,4 @@
-.PHONY: up down build logs shell inject inject-file replay live-say export-pi status pulse-mac
+.PHONY: up down build logs shell inject inject-file replay live-say deploy-pi export-pi status pulse-mac
 
 pulse-mac:
 	@echo "Stopping existing pulseaudio services..."
@@ -48,6 +48,11 @@ live-say:
 	@[ -n "$(TEXT)" ] || (echo "Usage: make live-say TEXT='...'"; exit 1)
 	curl -s -X POST http://localhost:3000/api/live/inject -H 'Content-Type: application/json' \
 	  -d "$$(jq -n --arg t "$(TEXT)" '{text: $$t}')"; echo
+
+# Build, ship and start on a Pi over SSH (key auth), e.g. make deploy-pi PI=pi@192.168.1.50
+deploy-pi:
+	@[ -n "$(PI)" ] || (echo "Usage: make deploy-pi PI=user@pi-host"; exit 1)
+	bash scripts/deploy-pi.sh $(PI)
 
 export-pi:
 	@echo "Saving image..."
