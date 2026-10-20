@@ -39,10 +39,13 @@ async def lifespan(app: FastAPI):
     from services.mcp_client import start_mcp_pool, stop_mcp_pool
     from arm.hub import hub as arm_hub
     await arm_hub.start()
-    try:
-        await start_mcp_pool()
-    except Exception as e:
-        print(f"[server] MCP pool start warning: {e}")
+    # Robot mode never publishes to Teams/Azure DevOps; skipping the warm MCP
+    # servers saves ~0.5 GB of RAM on the Pi.
+    if os.getenv("ROBOT_MODE", "false").lower() != "true":
+        try:
+            await start_mcp_pool()
+        except Exception as e:
+            print(f"[server] MCP pool start warning: {e}")
     yield
     print("[server] Shutting down")
     try:

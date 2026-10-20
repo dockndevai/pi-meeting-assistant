@@ -58,7 +58,7 @@ Raw numbers: [`arm/eval.json`](arm/eval.json).
 
 | Part | Notes |
 |---|---|
-| Raspberry Pi 5 (4–8 GB) | Laya + Vosk use ~1.5 GB RAM |
+| Raspberry Pi 5, 8 GB recommended | the arm uses ~2.3 GB RAM (Laya runs in fp32 on the CPU) |
 | 4-DOF acrylic arm kit | e.g. the common ₹279 laser-cut kit (no servos included) |
 | 4 × SG90 / MG90S servos | MG90S for base and shoulder if you can |
 | PCA9685 16-channel servo board | I2C; Pi → SDA/SCL/3.3 V/GND |
