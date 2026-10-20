@@ -28,6 +28,7 @@ load_dotenv()
 from routes.transcript import router as transcript_router
 from routes.approve    import router as approve_router
 from routes.live       import router as live_router
+from routes.arm        import router as arm_router
 
 
 # Decision: lifespan over @app.on_event (on_event is deprecated in FastAPI 0.95+)
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI):
     print(f"[server] Meeting assistant starting on port {os.getenv('PORT', '3000')}")
     # Warm Teams + Azure DevOps MCP once (Cursor-style long-lived processes).
     from services.mcp_client import start_mcp_pool, stop_mcp_pool
+    from arm.hub import hub as arm_hub
+    await arm_hub.start()
     try:
         await start_mcp_pool()
     except Exception as e:
@@ -75,6 +78,7 @@ async def log_validation_errors(request: Request, exc: RequestValidationError):
 app.include_router(transcript_router, prefix="/api/transcript")
 app.include_router(approve_router,    prefix="/api/approve")
 app.include_router(live_router)       # /ws/audio, /ws/live, /api/live/*
+app.include_router(arm_router)        # /arm, /api/arm/*, /ws/arm, /ws/arm/audio
 
 # ── Static files (dashboard UI) ───────────────────────────────────────────────
 # Decision: mount static files before the catch-all route

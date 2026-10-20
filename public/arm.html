@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laya Arm — voice-controlled robot arm on a Raspberry Pi</title>
+  <script>
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem("pmbot-theme"); } catch (e) {}
+      var theme = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      --bg: #FFFFFF; --panel: #F5F5F5; --hover: #EFEFEF; --border: #E5E5E5;
+      --ink: #0A0A0A; --muted: #737373; --ink-rgb: 10, 10, 10;
+      --accent: #0A0A0A; --accent-fg: #FFFFFF;
+      --green: #047857; --amber: #B45309; --rose: #BE123C; --cyan: #0E7490;
+      --green-rgb: 4, 120, 87; --amber-rgb: 180, 83, 9; --rose-rgb: 190, 18, 60; --cyan-rgb: 14, 116, 144;
+      --arm-link: #0A0A0A; --arm-joint: #FFFFFF; --arm-claw: #0E7490; --stage-grid: rgba(10,10,10,0.06);
+    }
+    :root[data-theme="dark"] {
+      --bg: #0A0A0A; --panel: #141414; --hover: #1F1F1F; --border: #2A2A2A;
+      --ink: #F2F2F2; --muted: #A3A3A3; --ink-rgb: 245, 245, 245;
+      --accent: #F2F2F2; --accent-fg: #0A0A0A;
+      --green: #34D399; --amber: #F59E0B; --rose: #F43F5E; --cyan: #22D3EE;
+      --green-rgb: 52, 211, 153; --amber-rgb: 245, 158, 11; --rose-rgb: 244, 63, 94; --cyan-rgb: 34, 211, 238;
+      --arm-link: #F2F2F2; --arm-joint: #0A0A0A; --arm-claw: #22D3EE; --stage-grid: rgba(245,245,245,0.06);
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; }
+    button, input { font: inherit; color: inherit; }
+
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+           padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+    .brand { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+    .brand h1 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+    .brand span { color: var(--muted); font-size: 0.85rem; }
+    .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    .chip { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border); border-radius: 999px;
+            padding: 0.3rem 0.75rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+    .chip.ok .dot { background: var(--green); } .chip.warn .dot { background: var(--amber); animation: pulse 1.2s infinite; }
+    .chip.err .dot { background: var(--rose); } .chip.live .dot { background: var(--rose); animation: pulse 1s infinite; }
+    .icon-btn { border: 1px solid var(--border); background: transparent; border-radius: 999px; width: 2rem; height: 2rem;
+                cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .icon-btn:hover { background: var(--hover); }
+    a.navlink { color: var(--muted); font-size: 0.8rem; text-decoration: none; border-bottom: 1px solid var(--border); }
+    a.navlink:hover { color: var(--ink); }
+
+    main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1rem 1.5rem 2rem; }
+    @media (min-width: 1100px) { main { grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); } }
+
+    .card { border: 1px solid var(--border); background: var(--bg); }
+    .card-h { display: flex; justify-content: space-between; align-items: center; padding: 0.7rem 1rem;
+              border-bottom: 1px solid var(--border); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em;
+              text-transform: uppercase; color: var(--muted); }
+    .card-b { padding: 1rem; }
+
+    /* Stage */
+    .stage { position: relative; background: var(--panel); }
+    .stage svg { display: block; width: 100%; height: auto; }
+    .stage-label { position: absolute; top: 1rem; left: 1.25rem; pointer-events: none; }
+    .stage-label .now { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.03em; text-transform: uppercase; line-height: 1; }
+    .stage-label .sub { color: var(--muted); font-size: 0.8rem; margin-top: 0.35rem; }
+    .joints { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); }
+    .joints div { padding: 0.6rem 1rem; border-right: 1px solid var(--border); }
+    .joints div:last-child { border-right: none; }
+    .joints dt { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .joints dd { margin: 0.15rem 0 0; font-family: var(--mono); font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .gesture-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+    .g-btn { border: 1px solid var(--border); background: transparent; padding: 0.35rem 0.7rem; font-size: 0.78rem;
+             cursor: pointer; font-weight: 500; }
+    .g-btn:hover { background: var(--hover); border-color: var(--ink); }
+    .g-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+    /* Right column */
+    .side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+    .cmd-row { display: flex; gap: 0.5rem; }
+    .cmd-row input { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--bg); padding: 0.7rem 0.85rem; font-size: 0.95rem; }
+    .cmd-row input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(var(--ink-rgb), 0.1); }
+    .btn { border: 1px solid transparent; padding: 0.65rem 1.1rem; font-weight: 600; cursor: pointer; border-radius: 999px;
+           background: var(--accent); color: var(--accent-fg); white-space: nowrap; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.mic { background: transparent; color: var(--ink); border-color: var(--border); display: inline-flex; align-items: center; gap: 0.45rem; }
+    .btn.mic.on { background: var(--rose); border-color: var(--rose); color: #fff; }
+    .examples { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.7rem; }
+    .ex { border: 1px dashed var(--border); background: transparent; padding: 0.25rem 0.55rem; font-size: 0.76rem; cursor: pointer; color: var(--muted); }
+    .ex:hover { color: var(--ink); border-color: var(--ink); }
+    .heard { margin-top: 0.75rem; min-height: 1.4rem; font-size: 0.95rem; color: var(--muted); font-style: italic; }
+
+    .decision .said { font-size: 1.05rem; line-height: 1.4; margin-bottom: 0.9rem; overflow-wrap: anywhere; }
+    .decision .said small { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.2rem; font-style: normal; }
+    .verdict { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem; }
+    .verdict .g { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; text-transform: uppercase; }
+    .verdict .g.none { color: var(--muted); }
+    .verdict .conf { font-family: var(--mono); font-size: 1rem; font-weight: 600; }
+    .tag { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+    .tag.warn { color: var(--amber); border-color: rgba(var(--amber-rgb), 0.4); }
+    .probs { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.5rem 0 1rem; }
+    .prob { display: grid; grid-template-columns: 5.5rem 1fr 3rem; gap: 0.6rem; align-items: center; font-size: 0.8rem; }
+    .prob .track { height: 8px; background: var(--panel); position: relative; }
+    .prob .fill { position: absolute; inset: 0 auto 0 0; background: var(--ink); transition: width 0.25s; }
+    .prob:not(:first-child) .fill { background: var(--muted); opacity: 0.6; }
+    .prob .v { font-family: var(--mono); text-align: right; color: var(--muted); }
+    .timing { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); }
+    .timing div { padding: 0.55rem 0.7rem; border-right: 1px solid var(--border); }
+    .timing div:last-child { border-right: none; }
+    .timing dt { font-size: 0.66rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .timing dd { margin: 0.1rem 0 0; font-family: var(--mono); font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .cands { margin-top: 0.8rem; font-size: 0.78rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.25rem; }
+    .cands b { color: var(--ink); font-weight: 600; }
+    .empty { color: var(--muted); font-size: 0.9rem; }
+
+    .history { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+    .history li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; padding: 0.55rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .history li:last-child { border-bottom: none; }
+    .history .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history .r { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+    .history .r b { color: var(--ink); font-weight: 600; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+    @media (prefers-reduced-motion: reduce) { .chip .dot { animation: none !important; } }
+    @media (max-width: 640px) {
+      .top, main { padding-left: 1rem; padding-right: 1rem; }
+      .stage-label .now { font-size: 1.5rem; }
+      .joints { grid-template-columns: repeat(2, 1fr); }
+      .joints div:nth-child(2) { border-right: none; }
+      .joints div:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Laya Arm</h1>
+      <span>Voice → Laya decision → motion · runs on a Raspberry Pi</span>
+    </div>
+    <div class="chips">
+      <span id="chipBrain" class="chip warn" title="Laya decision model"><span class="dot"></span><span>Laya: loading</span></span>
+      <span id="chipVoice" class="chip" title="Microphone streams"><span class="dot"></span><span>Voice: off</span></span>
+      <span id="chipDriver" class="chip" title="Where poses go"><span class="dot"></span><span>Driver: —</span></span>
+      <a class="navlink" href="/">Meeting dashboard</a>
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="card" aria-label="Arm simulator">
+      <div class="stage">
+        <div class="stage-label">
+          <div id="nowPlaying" class="now">Rest</div>
+          <div id="nowSub" class="sub">Waiting for a command</div>
+        </div>
+        <svg id="stageSvg" viewBox="0 0 640 420" role="img" aria-label="Side view of the robot arm, drawn from its live joint angles">
+          <defs>
+            <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <path d="M 32 0 L 0 0 0 32" fill="none" stroke="var(--stage-grid)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="640" height="420" fill="url(#grid)"/>
+          <line x1="40" y1="372" x2="600" y2="372" stroke="var(--border)" stroke-width="2"/>
+          <!-- Arm (geometry filled in by JS) -->
+          <g id="armGroup">
+            <rect x="262" y="336" width="116" height="36" rx="3" fill="var(--arm-link)" opacity="0.9"/>
+            <ellipse id="turntable" cx="320" cy="336" rx="52" ry="9" fill="var(--panel)" stroke="var(--arm-link)" stroke-width="3"/>
+            <line id="link1" stroke="var(--arm-link)" stroke-width="18" stroke-linecap="round"/>
+            <line id="link2" stroke="var(--arm-link)" stroke-width="14" stroke-linecap="round"/>
+            <line id="jawA" stroke="var(--arm-claw)" stroke-width="7" stroke-linecap="round"/>
+            <line id="jawB" stroke="var(--arm-claw)" stroke-width="7" stroke-linecap="round"/>
+            <circle id="j1" r="10" fill="var(--arm-joint)" stroke="var(--arm-link)" stroke-width="4"/>
+            <circle id="j2" r="8" fill="var(--arm-joint)" stroke="var(--arm-link)" stroke-width="4"/>
+            <circle id="j3" r="6" fill="var(--arm-claw)"/>
+          </g>
+          <!-- Top view: base rotation -->
+          <g transform="translate(560 78)" aria-hidden="true">
+            <circle r="44" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
+            <path d="M -44 0 A 44 44 0 0 1 44 0" fill="none" stroke="var(--border)" stroke-width="6" opacity="0.6"/>
+            <line id="baseNeedle" x1="0" y1="0" x2="0" y2="-36" stroke="var(--arm-link)" stroke-width="5" stroke-linecap="round"/>
+            <circle r="5" fill="var(--arm-link)"/>
+            <text y="62" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--font)">top view · base</text>
+          </g>
+        </svg>
+      </div>
+      <dl class="joints">
+        <div><dt>Base</dt><dd id="vBase">90°</dd></div>
+        <div><dt>Shoulder</dt><dd id="vShoulder">90°</dd></div>
+        <div><dt>Elbow</dt><dd id="vElbow">90°</dd></div>
+        <div><dt>Claw</dt><dd id="vClaw">15°</dd></div>
+      </dl>
+      <div id="gestureBar" class="gesture-bar" aria-label="Play a gesture directly"></div>
+    </section>
+
+    <div class="side">
+      <section class="card" aria-label="Command">
+        <div class="card-h"><span>Command</span><span id="srcHint">type or speak · English · Hinglish · हिंदी</span></div>
+        <div class="card-b">
+          <form id="cmdForm" class="cmd-row">
+            <input id="cmdInput" type="text" autocomplete="off" placeholder="e.g. haath hilao, pick up the pen quickly…" aria-label="Command for the arm">
+            <button id="sendBtn" class="btn" type="submit">Send</button>
+          </form>
+          <div class="cmd-row" style="margin-top: 0.5rem;">
+            <button id="micBtn" class="btn mic" type="button" aria-pressed="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+              <span id="micText">Use this browser's mic</span>
+            </button>
+          </div>
+          <div class="examples" id="examples"></div>
+          <div id="heard" class="heard" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="card decision" aria-label="Laya's decision" aria-live="polite">
+        <div class="card-h"><span>Laya's decision</span><span id="decSource"></span></div>
+        <div class="card-b" id="decisionBody"><p class="empty">Send a command to see what Laya decides, how sure it is, and where the time went.</p></div>
+      </section>
+
+      <section class="card" aria-label="Recent commands">
+        <div class="card-h"><span>Recent</span><span id="histCount">0</span></div>
+        <ul id="history" class="history"></ul>
+      </section>
+    </div>
+  </main>
+
+<script>
+  // ── Theme ────────────────────────────────────────────────────────────────
+  document.getElementById("themeBtn").onclick = () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("pmbot-theme", next); } catch (e) {}
+  };
+
+  // ── Arm drawing ─────────────────────────────────────────────────────────
+  // Side view. Shoulder 90 = upper arm vertical; larger leans forward.
+  // Elbow is relative: at shoulder 90 / elbow 90 the forearm is horizontal.
+  const L1 = 135, L2 = 125, SH = { x: 320, y: 326 };
+  const rad = d => d * Math.PI / 180;
+  const el = id => document.getElementById(id);
+  let pose = { base: 90, shoulder: 90, elbow: 90, claw: 15 };
+
+  function drawArm(p) {
+    const fore = Math.cos(rad(p.base - 90));          // foreshorten as the base turns away
+    const t1 = rad(180 - p.shoulder);
+    const t2 = rad(180 - p.shoulder - p.elbow);
+    const e = { x: SH.x + L1 * Math.cos(t1) * fore, y: SH.y - L1 * Math.sin(t1) };
+    const w = { x: e.x + L2 * Math.cos(t2) * fore, y: e.y - L2 * Math.sin(t2) };
+    setLine("link1", SH, e); setLine("link2", e, w);
+    setCircle("j1", SH); setCircle("j2", e); setCircle("j3", w);
+    const spread = rad(32 * (1 - p.claw / 60) + 3);      // claw 0 = open, 60 = closed
+    const jl = 30;
+    setLine("jawA", w, { x: w.x + jl * Math.cos(t2 + spread) * fore, y: w.y - jl * Math.sin(t2 + spread) });
+    setLine("jawB", w, { x: w.x + jl * Math.cos(t2 - spread) * fore, y: w.y - jl * Math.sin(t2 - spread) });
+    // top view needle: base 90 points straight ahead (up)
+    const a = rad(p.base - 90);
+    el("baseNeedle").setAttribute("x2", (36 * Math.sin(-a)).toFixed(1));
+    el("baseNeedle").setAttribute("y2", (-36 * Math.cos(a)).toFixed(1));
+    el("vBase").textContent = Math.round(p.base) + "°";
+    el("vShoulder").textContent = Math.round(p.shoulder) + "°";
+    el("vElbow").textContent = Math.round(p.elbow) + "°";
+    el("vClaw").textContent = Math.round(p.claw) + "°";
+  }
+  function setLine(id, a, b) {
+    const n = el(id);
+    n.setAttribute("x1", a.x.toFixed(1)); n.setAttribute("y1", a.y.toFixed(1));
+    n.setAttribute("x2", b.x.toFixed(1)); n.setAttribute("y2", b.y.toFixed(1));
+  }
+  function setCircle(id, c) { el(id).setAttribute("cx", c.x.toFixed(1)); el(id).setAttribute("cy", c.y.toFixed(1)); }
+  drawArm(pose);
+
+  // ── Live feed ───────────────────────────────────────────────────────────
+  const state = { history: [], ws: null, retry: 1000, playing: null };
+  const LABEL = { shake_no: "Shake no", none: "No action" };
+  const label = g => LABEL[g] || (g ? g.charAt(0).toUpperCase() + g.slice(1) : "");
+
+  function connect() {
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/arm`);
+    state.ws = ws;
+    ws.onopen = () => { state.retry = 1000; };
+    ws.onmessage = ev => { try { handle(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
+    ws.onclose = () => { setTimeout(connect, state.retry); state.retry = Math.min(state.retry * 2, 10000); };
+    ws.onerror = () => ws.close();
+  }
+  setInterval(() => { if (state.ws && state.ws.readyState === 1) state.ws.send("ping"); }, 25000);
+
+  function handle(m) {
+    switch (m.type) {
+      case "snapshot":
+        renderStatus(m); buildGestureBar(m.gestures);
+        pose = m.pose; drawArm(pose); setPlaying(m.playing);
+        state.history = (m.history || []).filter(h => h.type === "decision").reverse(); renderHistory();
+        if (state.history[0]) renderDecision(state.history[0]);
+        break;
+      case "status": renderStatus(m); break;
+      case "pose": pose = m.pose; drawArm(pose); setPlaying(m.playing); break;
+      case "voice": renderVoice(m); break;
+      case "partial": el("heard").textContent = m.text + " …"; break;
+      case "heard": el("heard").textContent = Object.entries(m.texts).filter(([, t]) => t).map(([l, t]) => `${l}: “${t}”`).join("   ·   ") || "(nothing recognised)"; break;
+      case "decision":
+        if (m.error) { el("decisionBody").innerHTML = `<p class="empty">${esc(m.error)}</p>`; break; }
+        state.history.unshift(m); state.history = state.history.slice(0, 50);
+        renderDecision(m); renderHistory(); break;
+      case "manual": setPlaying(m.gesture); break;
+    }
+  }
+
+  function renderStatus(s) {
+    const b = el("chipBrain");
+    b.className = "chip " + (s.brain === "ready" ? "ok" : s.brain === "error" ? "err" : "warn");
+    b.lastElementChild.textContent = s.brain === "ready" ? `Laya: ${s.brain_kind}` : s.brain === "error" ? "Laya: error" : "Laya: loading…";
+    b.title = s.brain_error || "Laya decision model";
+    const d = el("chipDriver");
+    d.className = "chip " + (s.driver === "simulator" ? "" : "ok");
+    d.lastElementChild.textContent = s.driver === "simulator" ? "Driver: simulator" : `Driver: ${s.driver} servos`;
+    renderVoice({ state: s.listening ? "listening" : "idle", listening: s.listening });
+  }
+  function renderVoice(v) {
+    const c = el("chipVoice");
+    if (v.state === "error") { c.className = "chip err"; c.lastElementChild.textContent = "Voice: error"; c.title = v.detail || ""; return; }
+    const on = v.state === "hearing" || v.state === "listening" || (v.listening || 0) > 0;
+    c.className = "chip " + (v.state === "hearing" ? "live" : on ? "ok" : "");
+    c.lastElementChild.textContent = v.state === "hearing" ? "Voice: hearing…" : on ? "Voice: listening" : "Voice: off";
+  }
+  function setPlaying(g) {
+    if (g === state.playing) return;
+    state.playing = g;
+    el("nowPlaying").textContent = g ? label(g) : "Rest";
+    el("nowSub").textContent = g ? "moving" : (state.history[0] ? `last: “${state.history[0].text}”` : "Waiting for a command");
+    document.querySelectorAll(".g-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.g === g));
+  }
+
+  function renderDecision(d) {
+    const top = (d.top || []).map(([g, p]) => `
+      <div class="prob"><span>${esc(label(g))}</span><span class="track"><span class="fill" style="width:${(p * 100).toFixed(0)}%"></span></span><span class="v">${(p * 100).toFixed(0)}%</span></div>`).join("");
+    const sp = d.speed_score == null ? "" : d.speed_score < 0.67 ? "slow" : d.speed_score > 1.33 ? "fast" : "normal";
+    const t = d.timing_ms || {};
+    const cands = (d.candidates || []).length > 1 ? `<div class="cands">${d.candidates.map(c =>
+      `<span>“${esc(c.text)}” → <b>${esc(label(c.gesture))}</b> ${(c.confidence * 100).toFixed(0)}%</span>`).join("")}</div>` : "";
+    const gated = d.gated ? `<span class="tag warn" title="Below the confidence gate, so the arm stayed still">not sure — stayed still</span>` : "";
+    el("decSource").textContent = d.source === "text" ? "typed" : "voice";
+    el("decisionBody").innerHTML = `
+      <div class="said"><small>${d.source === "text" ? "You typed" : "Heard"}</small>“${esc(d.text)}”</div>
+      <div class="verdict"><span class="g ${d.gesture === "none" ? "none" : ""}">${esc(label(d.gesture))}</span>
+        <span>${gated} <span class="conf">${(d.confidence * 100).toFixed(0)}%</span></span></div>
+      <div class="probs">${top}</div>
+      <dl class="timing">
+        <div><dt>Speech→text</dt><dd>${t.stt != null ? t.stt + " ms" : "—"}</dd></div>
+        <div><dt>Laya</dt><dd>${d.cached ? "cached" : (t.laya != null ? t.laya + " ms" : "—")}</dd></div>
+        <div><dt>Speed</dt><dd>${sp || "—"}</dd></div>
+      </dl>${cands}`;
+  }
+  function renderHistory() {
+    el("histCount").textContent = state.history.length;
+    el("history").innerHTML = state.history.slice(0, 30).map(h => `
+      <li><span class="t" title="${esc(h.text)}">“${esc(h.text)}”</span>
+          <span class="r"><b>${esc(label(h.gesture))}</b> ${(h.confidence * 100).toFixed(0)}% · ${h.timing_ms ? (h.cached ? "cached" : h.timing_ms.laya + "ms") : ""}</span></li>`).join("");
+  }
+  function buildGestureBar(gestures) {
+    el("gestureBar").innerHTML = (gestures || []).map(g => `<button type="button" class="g-btn" data-g="${g}">${esc(label(g))}</button>`).join("");
+    el("gestureBar").querySelectorAll(".g-btn").forEach(btn => btn.onclick = () =>
+      fetch("/api/arm/gesture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gesture: btn.dataset.g }) }));
+  }
+  function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+
+  // ── Commands ────────────────────────────────────────────────────────────
+  const EXAMPLES = ["wave hello to everyone", "haath hilao", "pick up the pen quickly", "धीरे से झुको", "nach ke dikhao", "say no", "the meeting is at three"];
+  el("examples").innerHTML = EXAMPLES.map(x => `<button type="button" class="ex">${esc(x)}</button>`).join("");
+  el("examples").querySelectorAll(".ex").forEach(b => b.onclick = () => { el("cmdInput").value = b.textContent; send(); });
+  el("cmdForm").onsubmit = e => { e.preventDefault(); send(); };
+  async function send() {
+    const text = el("cmdInput").value.trim();
+    if (!text) return;
+    el("sendBtn").disabled = true;
+    try {
+      const r = await fetch("/api/arm/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      if (!r.ok) el("decisionBody").innerHTML = `<p class="empty">${esc((await r.json()).detail || r.statusText)}</p>`;
+      el("cmdInput").value = "";
+    } catch (e) { console.error(e); }
+    finally { el("sendBtn").disabled = false; el("cmdInput").focus(); }
+  }
+
+  // ── Browser mic → /ws/arm/audio (16 kHz int16). Speech recognition stays on the server. ──
+  const mic = { on: false, ctx: null, ws: null, stream: null };
+  const WORKLET = `class P extends AudioWorkletProcessor {
+    process(inputs) { const ch = inputs[0][0]; if (ch) { const out = new Int16Array(ch.length);
+      for (let i = 0; i < ch.length; i++) { const s = Math.max(-1, Math.min(1, ch[i])); out[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+      this.port.postMessage(out.buffer, [out.buffer]); } return true; } }
+    registerProcessor("pcm16", P);`;
+  el("micBtn").onclick = async () => mic.on ? stopMic() : startMic();
+  async function startMic() {
+    try {
+      mic.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      mic.ctx = new AudioContext({ sampleRate: 16000 });
+      await mic.ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
+      const node = new AudioWorkletNode(mic.ctx, "pcm16");
+      mic.ctx.createMediaStreamSource(mic.stream).connect(node);
+      mic.ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/arm/audio?source=browser`);
+      mic.ws.binaryType = "arraybuffer";
+      node.port.onmessage = e => { if (mic.ws.readyState === 1) mic.ws.send(e.data); };
+      mic.ws.onclose = () => { if (mic.on) stopMic(); };
+      mic.on = true; el("micBtn").classList.add("on"); el("micBtn").setAttribute("aria-pressed", "true");
+      el("micText").textContent = "Listening — click to stop";
+    } catch (e) {
+      el("heard").textContent = "Microphone unavailable: " + e.message;
+      stopMic();
+    }
+  }
+  function stopMic() {
+    mic.on = false;
+    try { mic.ws && mic.ws.close(); } catch (e) {}
+    try { mic.ctx && mic.ctx.close(); } catch (e) {}
+    try { mic.stream && mic.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    el("micBtn").classList.remove("on"); el("micBtn").setAttribute("aria-pressed", "false");
+    el("micText").textContent = "Use this browser's mic";
+  }
+
+  connect();
+</script>
+</body>
+</html>

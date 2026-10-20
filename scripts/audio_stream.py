@@ -21,9 +21,9 @@ MAX_QUEUED = 600             # ~60s of 100ms messages
 
 
 class AudioStreamer:
-    def __init__(self, server_url: str, source: str = "mic"):
+    def __init__(self, server_url: str, source: str = "mic", path: str = "/ws/audio"):
         ws_base = server_url.replace("https://", "wss://").replace("http://", "ws://").rstrip("/")
-        self.url = f"{ws_base}/ws/audio?source={source}"
+        self.url = f"{ws_base}{path}?source={source}"
         self._q: "queue.Queue[bytes | None]" = queue.Queue()
         self._buf = bytearray()
         self._thread = threading.Thread(target=self._run, daemon=True)

@@ -9,6 +9,8 @@
 #   • Docker on the Pi, USB mic plugged in
 #   • ~/pi-meeting/.env on the Pi (created from .env.example on first run —
 #     fill in the keys there; this script never copies secrets)
+#   • For the robot arm: a trained model in arm/model (python -m arm.train);
+#     it is copied to ~/pi-meeting/models/laya-arm on the Pi
 #
 # Decision: stream the image over SSH instead of scp'ing a tarball
 #   `docker save | gzip | ssh docker load` needs no free space for a ~600 MB
@@ -58,9 +60,22 @@ if ! "${SSH[@]}" "test -f ~/$REMOTE_DIR/.env"; then
   echo "  SKIP_BUILD=1 scripts/deploy-pi.sh $PI"
   exit 2
 fi
-if "${SSH[@]}" "grep -qE '^(SARVAM_API_KEY|LLM_API_KEY)=\s*$' ~/$REMOTE_DIR/.env"; then
-  echo "SARVAM_API_KEY or LLM_API_KEY is empty in ~/$REMOTE_DIR/.env on the Pi — fill them in first." >&2
+# Robot mode is fully local (Vosk + Laya), so it needs no cloud keys.
+if "${SSH[@]}" "grep -qE '^ROBOT_MODE=true' ~/$REMOTE_DIR/.env"; then
+  echo "ROBOT_MODE=true — no cloud keys needed"
+elif "${SSH[@]}" "grep -qE '^(SARVAM_API_KEY|LLM_API_KEY)=\s*$' ~/$REMOTE_DIR/.env"; then
+  echo "SARVAM_API_KEY or LLM_API_KEY is empty in ~/$REMOTE_DIR/.env on the Pi — fill them in first," >&2
+  echo "or set ROBOT_MODE=true for the fully local robot arm." >&2
   exit 2
+fi
+
+if [ -f "$ROOT/arm/model/rl_agent_config.json" ]; then
+  step "Copying the fine-tuned Laya model to the Pi"
+  "${SSH[@]}" "mkdir -p ~/$REMOTE_DIR/models/laya-arm"
+  rsync -a --delete --info=stats1 -e "ssh -o BatchMode=yes" "$ROOT/arm/model/" "$PI:$REMOTE_DIR/models/laya-arm/"
+else
+  echo "No arm/model here — the arm will fall back to Laya's stock model (lower accuracy)."
+  echo "Train one with: python -m arm.dataset && python -m arm.train"
 fi
 
 if [ -z "${SKIP_BUILD:-}" ]; then
@@ -85,7 +100,8 @@ done
 docker run -d --name $NAME --restart unless-stopped --env-file .env \\
   -p 3000:3000 -e MOCK=false \\
   --device /dev/snd --group-add audio \\
-  -v pi-recordings:/recordings -v pi-data:/data \\
+  -v pi-recordings:/recordings -v pi-data:/data -v pi-hf:/models/hf \\
+  -v "\$PWD/models/laya-arm:/models/laya-arm:ro" \\
   -v "\$PWD/asoundrc:/root/.asoundrc:ro" \\
   -v "\$PWD/mcp.json:/app/mcp.json:ro" \\
   "\${extra[@]}" \\
@@ -93,13 +109,20 @@ docker run -d --name $NAME --restart unless-stopped --env-file .env \\
 EOF
 
 step "Verifying"
-sleep 12
+# Laya takes a few seconds to load on the Pi; wait for it before checking.
+for _ in $(seq 1 30); do
+  "${SSH[@]}" "curl -s -m 3 http://localhost:3000/api/arm/state 2>/dev/null | grep -qE '\"brain\":\"(ready|error)\"'" && break
+  sleep 3
+done
 "${SSH[@]}" "docker exec $NAME supervisorctl status || true"
 "${SSH[@]}" "docker exec $NAME tail -5 /var/log/supervisor/worker.log || true"
 STATUS="$("${SSH[@]}" 'curl -s -m 5 http://localhost:3000/api/transcript/pending' || true)"
-echo "API: ${STATUS:-no response}"
+echo "Meeting API: ${STATUS:-no response}"
+ARM="$("${SSH[@]}" 'curl -s -m 5 http://localhost:3000/api/arm/state | head -c 200' || true)"
+echo "Arm API:     ${ARM:-no response}"
 PI_IP="$("${SSH[@]}" "hostname -I | awk '{print \$1}'")"
 echo
 echo "Dashboard: http://$PI_IP:3000"
+echo "Robot arm: http://$PI_IP:3000/arm"
 echo "Logs:      ssh $PI docker exec $NAME tail -f /var/log/supervisor/server.log /var/log/supervisor/worker.log"
 echo "Rollback:  ssh $PI docker images 'pi-meeting:rollback-*'"

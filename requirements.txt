@@ -66,3 +66,19 @@ onnxruntime==1.18.1
 # returned transcript to <wav>.txt for transcribe_and_post.sh.
 
 
+# ── Robot arm (arm/) ─────────────────────────────────────────────────────────
+# Decision: CPU-only torch from PyTorch's own index
+#   The default aarch64 wheel can pull CUDA libraries the Pi will never use.
+#   The +cpu build sorts above the PyPI one, so pip picks it.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1
+
+# Decision: Laya for the arm's decision, not a generative LLM
+#   One forward pass picks a gesture from a fixed list with a calibrated
+#   confidence — it cannot invent a gesture that doesn't exist, and it runs
+#   on the Pi's CPU in well under a second. See arm/brain.py.
+laya==0.4.12
+
+# Decision: Vosk for on-device speech-to-text (see arm/stt.py)
+vosk==0.3.44
+smbus2==0.6.1    # PCA9685 servo board over I2C

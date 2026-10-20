@@ -8,7 +8,10 @@ echo "[worker] Waiting for FastAPI server..."
 until curl -sf "$SERVER_URL/api/transcript/pending" >/dev/null 2>&1; do sleep 2; done
 echo "[worker] Server is up."
 
-if [ "$MOCK" = "true" ]; then
+if [ "${ROBOT_MODE:-false}" = "true" ]; then
+  echo "[worker] ROBOT_MODE — streaming the mic to the robot arm (Vosk + Laya, all local)"
+  exec /opt/venv/bin/python3 /scripts/arm_voice.py
+elif [ "$MOCK" = "true" ]; then
   echo "[worker] MOCK mode — watching /test-transcripts for .txt files"
   echo "[worker] Or: docker exec pi-meeting bash /scripts/inject.sh 'your text'"
   exec bash /scripts/mock-watcher.sh

@@ -64,6 +64,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 #   and avoids a network dependency every time the container starts.
 RUN python3 -c "import openwakeword.utils; openwakeword.utils.download_models()"
 
+# Decision: bake the Vosk speech models into the image, mount the Laya one
+#   Vosk models are small (~130 MB) and fixed, so the image carries them and
+#   voice works offline from first boot. The fine-tuned Laya checkpoint is
+#   ~0.65 GB and changes whenever it's retrained, so it's mounted from the
+#   host at /models/laya-arm instead (scripts/deploy-pi.sh copies it over).
+COPY scripts/fetch_models.sh /tmp/fetch_models.sh
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
+  && bash /tmp/fetch_models.sh /models/vosk
+ENV VOSK_MODELS_DIR=/models/vosk ARM_MODEL_DIR=/models/laya-arm \
+    HF_HOME=/models/hf TOKENIZERS_PARALLELISM=false
+
 # ── Application code ──────────────────────────────────────────────────────────
 WORKDIR /app
 COPY main.py .
@@ -72,6 +83,7 @@ COPY routes/   routes/
 COPY services/ services/
 COPY config/   config/
 COPY public/   public/
+COPY arm/      arm/
 
 # ── Scripts ───────────────────────────────────────────────────────────────────
 COPY scripts/ /scripts/

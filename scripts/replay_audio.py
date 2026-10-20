@@ -7,6 +7,7 @@ test the real-time transcript on a laptop without audio hardware.
 
     python3 scripts/replay_audio.py test-transcripts/speech_upload.wav
     python3 scripts/replay_audio.py meeting.wav --speed 2 --no-end
+    python3 scripts/replay_audio.py commands.wav --arm   # into the robot arm instead
 
 Streams at real-time pace (--speed to go faster), then ends the meeting via
 /record/processing so the summary/review flow runs, unless --no-end.
@@ -57,14 +58,18 @@ def main():
     parser.add_argument("--server", default=os.environ.get("SERVER_URL", "http://localhost:3000").rstrip("/"))
     parser.add_argument("--speed", type=float, default=1.0, help="playback speed multiplier")
     parser.add_argument("--no-end", action="store_true", help="leave the meeting running afterwards")
+    parser.add_argument("--arm", action="store_true", help="send to the robot arm's voice input (/ws/arm/audio)")
     args = parser.parse_args()
 
     pcm = load_pcm16k(args.wav)
     seconds = len(pcm) / (TARGET_RATE * 2)
     print(f"[replay] {args.wav.name}: {seconds:.1f}s of audio at {args.speed}x")
 
-    print(f"[replay] Starting meeting: {post(args.server, '/api/transcript/record/active')}")
-    streamer = AudioStreamer(args.server, source="replay")
+    if args.arm:
+        streamer = AudioStreamer(args.server, source="replay", path="/ws/arm/audio")
+    else:
+        print(f"[replay] Starting meeting: {post(args.server, '/api/transcript/record/active')}")
+        streamer = AudioStreamer(args.server, source="replay")
 
     step = int(TARGET_RATE * 2 * FRAME_MS / 1000)
     start = time.time()
@@ -80,6 +85,10 @@ def main():
         time.sleep(FRAME_MS / 1000 / args.speed)
     streamer.close()
 
+    if args.arm:
+        time.sleep(2)   # let the last utterance finish decoding before the socket closes
+        print("[replay] Done")
+        return
     if args.no_end:
         print("[replay] Done — meeting left running (--no-end)")
         return

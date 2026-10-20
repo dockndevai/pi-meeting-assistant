@@ -1,0 +1,6 @@
+.git
+arm/model
+arm/data
+scratch
+*.wav
+__pycache__

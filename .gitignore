@@ -31,3 +31,7 @@ pi-meeting.tar.gz
 # Local MCP auth tokens
 .msgraph-mcp-auth.json
 .teams-mcp-token-cache.json
+
+# Robot arm: trained weights and generated data are rebuilt by arm/train.py
+/arm/model/
+/arm/data/
