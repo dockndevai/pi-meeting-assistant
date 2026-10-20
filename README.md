@@ -36,7 +36,23 @@ mic (Pi or browser) ──► Vosk speech-to-text (local) ──► Laya: which 
 Fine-tuned from Laya's multilingual checkpoint on synthetic commands
 (`arm/dataset.py`). The test set uses **phrasings and templates never seen in training**.
 
-<!-- RESULTS -->
+| Held-out test (135 commands) | Stock Laya multilingual | **Fine-tuned** |
+|---|---|---|
+| Overall | 43.7% | **79.3%** |
+| English | 63.5% | **88.5%** |
+| Hinglish (romanised) | 31.1% | **71.1%** |
+| Hindi (Devanagari) | 31.6% | **76.3%** |
+
+With the default 0.45 confidence gate the arm acts on 91% of commands and is right **86%** of the
+time when it does; it performed a wrong gesture on 12% and reacted to 2 of 18 chatter sentences.
+Raw numbers: [`arm/eval.json`](arm/eval.json).
+
+**Speed** — one Laya decision is ~105–190 ms (laptop CPU, Apple M-series); Vosk speech-to-text adds
+~0.5–1 s per spoken command. Raspberry Pi 5 numbers: *to be measured* (expect a few × slower).
+
+**Known misses** — short one-word Hindi commands are hard for the small speech model
+(*“रुको”* was heard as *“को”*; the gate kept the arm still). *“haan bolo”* (say yes) can come out as
+*shake no*. More varied training phrasings is the obvious next step.
 
 ### Hardware (~₹1,500)
 

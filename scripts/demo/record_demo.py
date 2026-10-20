@@ -33,11 +33,12 @@ from audio_stream import AudioStreamer  # noqa: E402
 # (kind, text, caption, voice)
 SCRIPT = [
     ("type", "wave hello to everyone", "Typed · English", None),
-    ("type", "haath hilao", "Typed · Hinglish", None),
-    ("type", "धीरे से झुको", "Typed · Hindi — “bow slowly”", None),
-    ("type", "pick up the pen quickly", "Typed · English, with speed", None),
-    ("type", "the meeting is at three o'clock", "Not a command — the arm stays still", None),
-    ("say", "nach ke dikhao", "Spoken · Hinglish — on-device speech-to-text", "Rishi"),
+    ("type", "haath hilao", "Typed · Hinglish — “wave your hand”", None),
+    ("type", "धीरे से झुको", "Typed · Hindi — “bow slowly” (speed from the same pass)", None),
+    ("type", "pick up the pen quickly", "Typed · English, fast", None),
+    ("type", "the meeting is at three o'clock", "Not a command — Laya says none, the arm stays still", None),
+    ("say", "नाच के दिखाओ", "Spoken · Hindi “show me a dance” — on-device speech-to-text", "Lekha"),
+    ("say", "point to the left", "Spoken · English", "Rishi"),
     ("say", "please say no", "Spoken · English", "Rishi"),
     ("type", "ruko", "Typed · Hinglish — “stop”", None),
 ]

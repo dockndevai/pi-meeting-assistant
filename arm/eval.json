@@ -1,0 +1,125 @@
+{
+  "baseline": {
+    "accuracy": 0.437,
+    "by_lang": {
+      "en": {
+        "correct": 33,
+        "total": 52,
+        "accuracy": 0.635
+      },
+      "hi_latn": {
+        "correct": 14,
+        "total": 45,
+        "accuracy": 0.311
+      },
+      "hi_deva": {
+        "correct": 12,
+        "total": 38,
+        "accuracy": 0.316
+      }
+    },
+    "top_confusions": [
+      [
+        "none->release",
+        8
+      ],
+      [
+        "point->release",
+        5
+      ],
+      [
+        "dance->wave",
+        5
+      ],
+      [
+        "rest->release",
+        5
+      ],
+      [
+        "grab->release",
+        4
+      ],
+      [
+        "none->rest",
+        4
+      ],
+      [
+        "wave->release",
+        3
+      ],
+      [
+        "wave->shake_no",
+        2
+      ]
+    ],
+    "latency_ms": {
+      "median": 92,
+      "p95": 114
+    }
+  },
+  "train_seconds": 3443,
+  "finetune_summary": {
+    "train_items": 2078,
+    "calibration_items": 230,
+    "eval_items": 230,
+    "output_dir": "arm/model"
+  },
+  "finetuned": {
+    "accuracy": 0.793,
+    "by_lang": {
+      "en": {
+        "correct": 46,
+        "total": 52,
+        "accuracy": 0.885
+      },
+      "hi_latn": {
+        "correct": 32,
+        "total": 45,
+        "accuracy": 0.711
+      },
+      "hi_deva": {
+        "correct": 29,
+        "total": 38,
+        "accuracy": 0.763
+      }
+    },
+    "top_confusions": [
+      [
+        "grab->release",
+        2
+      ],
+      [
+        "release->bow",
+        2
+      ],
+      [
+        "dance->rest",
+        2
+      ],
+      [
+        "dance->bow",
+        2
+      ],
+      [
+        "rest->shake_no",
+        2
+      ],
+      [
+        "rest->grab",
+        2
+      ],
+      [
+        "wave->dance",
+        1
+      ],
+      [
+        "wave->none",
+        1
+      ]
+    ],
+    "latency_ms": {
+      "median": 121,
+      "p95": 143
+    }
+  }
+}

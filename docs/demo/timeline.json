@@ -1,0 +1,56 @@
+[
+  {
+    "t": 4.15,
+    "kind": "type",
+    "text": "wave hello to everyone",
+    "laya": "“wave hello to everyone”\nWave 100% · 122ms"
+  },
+  {
+    "t": 10.28,
+    "kind": "type",
+    "text": "haath hilao",
+    "laya": "“haath hilao”\nWave 85% · 114ms"
+  },
+  {
+    "t": 15.82,
+    "kind": "type",
+    "text": "धीरे से झुको",
+    "laya": "“धीरे से झुको”\nBow 97% · 121ms"
+  },
+  {
+    "t": 22.97,
+    "kind": "type",
+    "text": "pick up the pen quickly",
+    "laya": "“pick up the pen quickly”\nGrab 100% · 123ms"
+  },
+  {
+    "t": 27.6,
+    "kind": "type",
+    "text": "the meeting is at three o'clock",
+    "laya": "“the meeting is at three o'clock”\nNo action 99% · 130ms"
+  },
+  {
+    "t": 34.83,
+    "kind": "say",
+    "text": "नाच के दिखाओ",
+    "laya": "“नच के दिखाओ”\nDance 85% · 162ms"
+  },
+  {
+    "t": 43.4,
+    "kind": "say",
+    "text": "point to the left",
+    "laya": "“point to the left”\nPoint 99% · 187ms"
+  },
+  {
+    "t": 50.45,
+    "kind": "say",
+    "text": "please say no",
+    "laya": "“please say no”\nShake no 100% · 164ms"
+  },
+  {
+    "t": 52.93,
+    "kind": "type",
+    "text": "ruko",
+    "laya": "“ruko”\nRest 98% · 151ms"
+  }
+]
