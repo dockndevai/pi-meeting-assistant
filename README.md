@@ -14,6 +14,8 @@ Two things that run on one Raspberry Pi 5:
 
 ▶ [Demo video with sound](docs/demo/demo.mp4)
 
+📝 Write-up: [I built a robot arm that understands Hinglish — on a Raspberry Pi, with no LLM](https://dockndev.medium.com/i-built-a-robot-arm-that-understands-hinglish-on-a-raspberry-pi-with-no-llm-209e5408870d)
+
 ---
 
 ## Laya Arm
