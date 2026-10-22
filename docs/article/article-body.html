@@ -1,0 +1,151 @@
+
+<p>Most people I work with don't speak English <em>or</em> Hindi. They speak both at once: <em>"pen uthao quickly"</em>, <em>"haath hilao yaar"</em>, <em>"धीरे से झुको"</em>. I wanted a robot I could talk to that way. And I wanted it to run on a Raspberry Pi with no internet, because a robot that stops working when the Wi-Fi drops isn't much of a robot.</p>
+<p>The obvious design in 2026 is "put a language model in the loop". I tried the other direction, and I think it's the better one for this kind of job. Here's what I built, what the numbers look like, and where it still fails.</p>
+<p><strong>Code, training script, evaluation and demo video:</strong> <a href="https://github.com/dockndevai/pi-meeting-assistant">github.com/dockndevai/pi-meeting-assistant</a> (MIT).</p>
+<p><img src="https://raw.githubusercontent.com/dockndevai/pi-meeting-assistant/main/docs/article/01-typed-wave.png" alt=""wave hello to everyone" → WAVE, 100%, 122 ms. The left panel is the simulator drawing the arm from its live joint angles."></p>
+<p><em>"wave hello to everyone" → WAVE, 100%, 122 ms. The left panel is the simulator drawing the arm from its live joint angles.</em></p>
+
+<h2>The pipeline, end to end</h2>
+<pre><code>microphone ─► speech-to-text (Vosk, on the Pi)
+                    │  Indian-English model + Hindi model, both on every utterance
+                    ▼
+            Laya: &quot;which gesture does this ask for?  how fast?&quot;
+                    │  one forward pass, calibrated confidence, &quot;none&quot; if it's just talk
+                    ▼
+            motion engine (50 Hz, eased keyframes)
+                    │
+                    ▼
+            PCA9685 servo board → 4 servos        (or the on-screen simulator)
+</code></pre>
+<p>Nothing in that chain leaves the device. No API keys, no cloud, no wake word.</p>
+<h2>Why not an LLM?</h2>
+<p>Three reasons, in order of how much they mattered.</p>
+<p><strong>1. A robot should not be able to hallucinate an action.</strong> A generative model asked to output <code>gesture("wave")</code> can also output <code>gesture("salute")</code>, <code>gesture("wave", repeat=200)</code>, or a paragraph of JSON-ish text that doesn't parse. You end up writing a validation layer to protect the servos from the model. With a model that can only <em>choose from a list</em>, that layer is the model.</p>
+<p><strong>2. Latency on a Pi.</strong> A small LLM on a Pi 5 CPU produces a few tokens per second. Even a one-word answer, after the prompt is processed, is seconds away. For "stop!" that's too slow to feel like control.</p>
+<p><strong>3. Confidence you can act on.</strong> I wanted a rule like "if you're not sure, don't move." For that, the model's confidence has to actually mean something.</p>
+<h2>Laya: a model that decides instead of generating</h2>
+<p><a href="https://github.com/NandhaKishorM/laya">Laya</a> is a non-autoregressive "System 1" decision engine. You give it a piece of text (the <em>state</em>) and a set of typed questions, and it answers all of them in a single encoder forward pass:</p>
+<ul>
+<li><strong>choice</strong> — pick one option from a list you define</li>
+<li><strong>score</strong> — pick a level on an ordinal scale</li>
+<li><strong>yes/no</strong> — a calibrated probability</li>
+</ul>
+<p>It's built on ModernBERT / mmBERT encoders (300–420M parameters), ships three checkpoints, and is trained with proper scoring rules so the confidences are calibrated rather than vibes. It runs on CPU.</p>
+<p>For the arm, the schema is tiny:</p>
+<pre><code class="language-python">QUESTIONS = {
+    &quot;gesture&quot;: {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;instructions&quot;: &quot;Which robot arm gesture does `command` ask for?&quot;,
+        &quot;criteria&quot;: {
+            &quot;wave&quot;: &quot;wave hello or goodbye&quot;,
+            &quot;point&quot;: &quot;point at something or a direction&quot;,
+            &quot;nod&quot;: &quot;nod yes, agree&quot;,
+            &quot;shake_no&quot;: &quot;shake no, disagree&quot;,
+            &quot;bow&quot;: &quot;bow, thank, show respect&quot;,
+            &quot;grab&quot;: &quot;grab, pick up, hold&quot;,
+            &quot;release&quot;: &quot;release, drop, let go&quot;,
+            &quot;dance&quot;: &quot;dance, celebrate&quot;,
+            &quot;rest&quot;: &quot;stop, relax, rest position&quot;,
+            &quot;random&quot;: &quot;do anything, surprise me&quot;,
+            &quot;none&quot;: &quot;not an instruction to the robot arm&quot;,
+        },
+    },
+    &quot;speed&quot;: {
+        &quot;type&quot;: &quot;score&quot;,
+        &quot;instructions&quot;: &quot;How fast should the robot arm move for `command`?&quot;,
+        &quot;criteria&quot;: [&quot;slow: gently, slowly&quot;, &quot;normal: no speed mentioned&quot;, &quot;fast: quickly, hurry&quot;],
+    },
+}
+</code></pre>
+<p>Two things to notice.</p>
+<p>The <strong><code>none</code> option</strong> is what lets the arm listen all the time. <em>"The meeting is at three o'clock"</em> → <code>none</code> (99%) → nothing moves. There's no wake word because the model itself decides whether you were talking to it.</p>
+<p><strong>Speed is a second question on the same pass.</strong> <em>"धीरे से झुको"</em> (bow slowly) gives <code>bow</code> at 97% and a speed score of 0.0 (slow) from the same ~120 ms of compute. The motion engine turns that into a duration multiplier.</p>
+<p><img src="https://raw.githubusercontent.com/dockndevai/pi-meeting-assistant/main/docs/article/02-hindi-bow.png" alt="Hindi in, bow out, speed = slow. The arm is mid-bow: shoulder 140°, elbow 135°."></p>
+<p><em>Hindi in, bow out, speed = slow. The arm is mid-bow: shoulder 140°, elbow 135°.</em></p>
+
+<h2>Stock Laya wasn't good enough for Hinglish</h2>
+<p>Out of the box, on my held-out test set, Laya's multilingual checkpoint got <strong>43.7%</strong>. English was fine-ish (63.5%), but romanised Hinglish — <em>"nach ke dikhao"</em>, <em>"udhar dikhao"</em> — was 31%. Not surprising: "haath hilao" isn't in anyone's pretraining data as a robot command.</p>
+<p>So I fine-tuned it. Laya ships a training loop (<code>laya.train.finetune</code>) that takes JSONL rows of <code>{state, questions, expected}</code>.</p>
+<h3>The dataset is synthetic, and the split is the important part</h3>
+<p>I don't have a thousand recorded commands. I have phrase banks:</p>
+<pre>Gesture  English                                           Hinglish                             Hindi
+-------  ------------------------------------------------  -----------------------------------  ------------------------------
+wave     wave hello, say hi, greet everyone…               haath hilao, hello bolo, tata karo…  हाथ हिलाओ, हेलो बोलो…
+grab     pick up the pen, grab it, close the claw…         pen uthao, isko pakdo…               पेन उठाओ, इसे पकड़ो…
+none     the meeting is at three, did you check the logs…  report bhej do, chai peene chalein…  रिपोर्ट भेज दो, खाना तैयार है…
+…</pre>
+<p>Each phrase gets wrapped in templates (<em>"robot, …"</em>, <em>"zara …"</em>, <em>"कृपया …"</em>, <em>"… please"</em>) and sometimes a speed word (<em>"jaldi se …"</em>, <em>"… slowly"</em>). That gives 1,154 training rows and 135 test rows.</p>
+<p>The part I'd argue is non-negotiable: <strong>whole phrasings and whole templates are held out.</strong> The test set contains wording the model never saw during training. If I'd split on rows, the same phrase would appear on both sides with a different wrapper, and I'd be measuring memorisation.</p>
+<h3>Training</h3>
+<p>Four epochs of soft cross-entropy on the multilingual checkpoint, with Laya's option-order shuffling turned on so the model can't learn "the third option is usually right". About an hour on a laptop GPU (Apple M-series), including the before/after evaluation. The result is a ~650 MB fp16 checkpoint that loads with <code>laya.load("arm/model")</code>.</p>
+<h3>Results</h3>
+<pre>Held-out (135 commands, unseen phrasings)  Stock multilingual  Fine-tuned
+-----------------------------------------  ------------------  ----------
+Overall                                    43.7%               79.3%
+English (52)                               63.5%               88.5%
+Hinglish, romanised (45)                   31.1%               71.1%
+Hindi, Devanagari (38)                     31.6%               76.3%</pre>
+<p>Laya's own calibration report on its in-sample slice went from ECE 0.20 → 0.007, which is the number that makes the next section work.</p>
+<h2>The confidence gate</h2>
+<p>The arm only moves if Laya's confidence in the chosen gesture is at least <strong>0.45</strong>. Because the confidences are calibrated, this threshold behaves the way you'd hope:</p>
+<pre>Gate            Acts on           Accuracy when it acts
+--------------  ----------------  ---------------------
+none            100% of commands  79.3%
+0.45 (default)  91%               86.2%
+0.60            90%               86.8%
+0.80            83%               88.4%</pre>
+<p>At the default gate it performed a <em>wrong</em> gesture on 12% of held-out commands, ignored 13 real commands, and reacted to 2 of 18 chatter sentences. Raise the gate and it gets more cautious; lower it and it gets more eager. One number, no retraining.</p>
+<p><img src="https://raw.githubusercontent.com/dockndevai/pi-meeting-assistant/main/docs/article/03-not-a-command.png" alt=""the meeting is at three o'clock" → No action, 99%. The arm stays at rest."></p>
+<p><em>"the meeting is at three o'clock" → No action, 99%. The arm stays at rest.</em></p>
+
+<h2>Voice: two recognisers, one decision</h2>
+<p>Speech-to-text runs locally with <a href="https://alphacephei.com/vosk/">Vosk</a>. The small models are ~50–80 MB each and decode a two-second command in a few hundred milliseconds on CPU.</p>
+<p>The problem is that no single small model handles both languages. The Indian-English model hears <em>"wave hello to everyone"</em> fine and turns <em>"हाथ हिलाओ"</em> into "hello". The Hindi model does the reverse: <em>"नाच के दिखाओ"</em> comes out right, in Devanagari, which Laya reads natively, while English becomes <em>"लीज से नौ"</em>.</p>
+<p>So both models decode every utterance, both transcripts go to Laya in one batch, and <strong>the more confident non-<code>none</code> decision wins</strong>. Laya, not a heuristic, decides which hearing to trust.</p>
+<p><img src="https://raw.githubusercontent.com/dockndevai/pi-meeting-assistant/main/docs/article/04-spoken-hindi-dance.png" alt="Spoken "नाच के दिखाओ". The English model heard "k dick how" (→ random, 60%); the Hindi model heard "नच के दिखाओ" (→ dance, 85%). Dance wins. Speech-to-text 561 ms, Laya 162 ms."></p>
+<p><em>Spoken "नाच के दिखाओ". The English model heard "k dick how" (→ random, 60%); the Hindi model heard "नच के दिखाओ" (→ dance, 85%). Dance wins. Speech-to-text 561 ms, Laya 162 ms.</em></p>
+
+<p>I use webrtcvad for endpointing so both recognisers see identical utterance boundaries, and a 600 ms silence closes an utterance.</p>
+<h2>Motion: keyframes, easing, and blending from wherever you are</h2>
+<p>The arm is a 4-DOF acrylic kit: base turn, shoulder lean, elbow lift, claw. Each gesture is a list of <code>(duration_ms, partial pose)</code> keyframes:</p>
+<pre><code class="language-python">&quot;wave&quot;: [
+    (500, {&quot;shoulder&quot;: 70, &quot;elbow&quot;: 45, &quot;claw&quot;: 0, &quot;base&quot;: 90}),   # raise
+    *repeat([(320, {&quot;base&quot;: 62, &quot;elbow&quot;: 38}), (320, {&quot;base&quot;: 118, &quot;elbow&quot;: 52})], 3),
+    (350, {&quot;base&quot;: 90}),
+    (600, HOME),
+],
+</code></pre>
+<p>A 50 Hz loop eases between keyframes with a cosine curve, so every joint starts and stops together; that's the difference between "deliberate" and "servo-jerky". Three details that mattered more than I expected:</p>
+<ul>
+<li><strong>A new command blends from the current pose.</strong> Saying "stop" mid-wave doesn't snap the arm back to a start position first; the new timeline begins wherever the arm is.</li>
+<li><strong>Velocity is capped per tick</strong> (360 °/s) on top of the easing, because an SG90 under load can't follow a step and will just buzz.</li>
+<li><strong>Speed from Laya is a duration multiplier</strong> (0.6× for fast, 1.7× for slow), applied to the whole timeline.</li>
+</ul>
+<p>Output goes to a PCA9685 PWM board over I2C (a 60-line driver using <code>smbus2</code>, no vendor SDK), or to the simulator you see in the screenshots, which draws the arm from the same joint angles every screen receives over a WebSocket.</p>
+<p><img src="https://raw.githubusercontent.com/dockndevai/pi-meeting-assistant/main/docs/article/05-spoken-shake-no.png" alt="Spoken "please say no" → SHAKE NO. Base swinging, 100%, 164 ms."></p>
+<p><em>Spoken "please say no" → SHAKE NO. Base swinging, 100%, 164 ms.</em></p>
+
+<h2>What it costs</h2>
+<pre>Part                                    ~Price
+--------------------------------------  --------
+4-DOF acrylic arm kit (no servos)       ₹279
+4 × SG90 / MG90S micro servos           ₹400–600
+PCA9685 16-channel servo board          ₹300
+5 V 2–3 A supply + jumper wires         ₹350
+Raspberry Pi 5 (you probably have one)  —</pre>
+<p>About ₹1,500 (~$18) on top of the Pi. The arm uses ~2.3 GB of RAM (Laya runs in fp32 on the CPU), so an 8 GB Pi is the comfortable choice.</p>
+<h2>Where it fails</h2>
+<p>I'd rather you hear this from me than find it in the repo.</p>
+<ul>
+<li><strong>The demo is the simulator.</strong> The servos aren't wired yet. The motion engine and driver are written and the Pi image is built and tested in emulation, but I have not watched real plastic move.</li>
+<li><strong>No Raspberry Pi timings yet.</strong> The ~0.1 s per decision is a laptop CPU. In an emulated arm64 container it was 290–490 ms; a real Pi 5 will land somewhere, and I'll publish the number when I have it.</li>
+<li><strong>Short Hindi words are hard for the small speech model.</strong> Spoken <em>"रुको"</em> (stop) was heard as <em>"को"</em>; the gate kept the arm still, which is the right failure, but it's still a failure.</li>
+<li><strong>"haan bolo"</strong> (say yes) sometimes comes out as <em>shake no</em>. More varied training phrasings is the obvious next step.</li>
+<li><strong>Fixed vocabulary.</strong> It can only do the gestures I defined. "Wiggle only the claw slowly" is not an option until I add it.</li>
+<li><strong>No vision.</strong> "Pick up the red cube" needs a camera and that's a different project.</li>
+</ul>
+<h2>What I'd take away</h2>
+<p>The interesting part isn't the arm. It's that <strong>a decision model is a better interface between speech and actuators than a generative one</strong> for a bounded task: it's faster, it can't invent actions, and calibrated confidence gives you a safety knob that actually works. The fine-tune took an afternoon and a synthetic dataset. The same pattern would fit a smart light, a wheelchair control, a kiosk — anything with a fixed menu of actions and users who don't speak textbook English.</p>
+<p>Next up: wiring the servos, measuring on the real Pi 5, and a five-finger hand so the gesture list can grow.</p>
+<p><strong>Repo:</strong> <a href="https://github.com/dockndevai/pi-meeting-assistant">github.com/dockndevai/pi-meeting-assistant</a> · Laya: <a href="https://github.com/NandhaKishorM/laya">github.com/NandhaKishorM/laya</a> · Vosk: <a href="https://alphacephei.com/vosk/">alphacephei.com/vosk</a></p>
+<p><em>If you build one, or break it, I'd like to hear about it.</em></p>
